@@ -15,3 +15,6 @@ upload-to-github/
 # OS / editor noise
 .DS_Store
 Thumbs.db
+
+# the template with no real values is safe to commit
+!.env.example

@@ -60,3 +60,6 @@ __pycache__/
 .env
 .env.*
 *.key
+
+# the template with no real values is safe to commit
+!.env.example

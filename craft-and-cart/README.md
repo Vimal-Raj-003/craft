@@ -1,46 +1,28 @@
-# Craft & Cart
+# Craft & Cart — the website
 
-Animated, dynamic crochet e-commerce store. Next.js 16 · TypeScript · Tailwind v4 · GSAP · Lenis · Motion · React Three Fiber · PostgreSQL · Razorpay.
+This folder is the Next.js store itself. The full documentation (features, tech stack, payments, deployment, security,
+troubleshooting) is in the **[main README](../README.md)**.
 
-## Run it (two terminals)
+## Quick start
 
 ```bash
-npm run db:start   # local PostgreSQL (port 54329) — keep running
-npm run db:seed    # once: creates tables, products, admin user
-npm run dev        # http://localhost:3000
+npm install
+cp .env.example .env.local        # Windows PowerShell: Copy-Item .env.example .env.local
+npm run db:start                  # terminal 1: built-in PostgreSQL (keep it running)
+npm run db:seed                   # terminal 2: tables, products, admin account
+npm run dev                       # http://localhost:3000
 ```
 
-Admin login: `admin@craftandcart.local` / `admin12345` (change in `.env.local` before seeding).
+Local admin login: `admin@craftandcart.local` with the demo password `admin12345` (or your `ADMIN_PASSWORD`).
+Use a strong, private password on any public site.
 
-## Payments: PhonePe (online) or Cash on Delivery
+## Folders
 
-Customers choose at checkout. "Pay online" uses **PhonePe Payment Gateway** (UPI / PhonePe wallet / cards / netbanking; opens the PhonePe app on phones).
+- `src/app` pages and API routes · `src/components` UI · `src/lib` database, auth, cart and payment helpers
+- `db/schema.sql` tables · `scripts/` local database and seed · `public/` images · `docs/screenshots/` README images
 
-1. Register a merchant account at https://business.phonepe.com and get your Client ID, Client Secret and Client Version (Developer settings).
-2. Put them in `.env.local`:
+## More
 
-```
-PHONEPE_ENV=sandbox            # switch to production when you go live
-PHONEPE_CLIENT_ID=...
-PHONEPE_CLIENT_SECRET=...
-PHONEPE_CLIENT_VERSION=1
-PHONEPE_WEBHOOK_USER=...       # you choose these; use the same values on the webhook in the PhonePe dashboard
-PHONEPE_WEBHOOK_PASS=...
-NEXT_PUBLIC_SITE_URL=https://your-domain.com   # where PhonePe sends the customer back to
-```
-
-3. Webhook URL: `https://<domain>/api/webhooks/phonepe` (events `checkout.order.completed`, `checkout.order.failed`).
-
-Payment results are never trusted from the browser: after PhonePe returns the customer, and on every webhook, the server asks PhonePe for the order status before marking it paid.
-With the keys blank, online payment runs in **demo mode** (simulated, no money moves). Cash on Delivery works either way.
-## Using a regular PostgreSQL install instead
-
-Install PostgreSQL, create a database, run `db/schema.sql`, set `DATABASE_URL` in `.env.local`, then `npm run db:seed`.
-Skip `npm run db:start`.
-
-## Layout
-
-- `db/schema.sql` — tables · `scripts/` — DB server + seed
-- `src/lib/` — db, auth (JWT cookie), Razorpay helpers, cart store
-- `src/app/api/` — products, auth, checkout (+verify), webhook, contact, admin
-- `src/components/` — Hero3D, YarnThread (scroll-drawn thread), ProductCard (3D tilt), CartDrawer, cursor/smooth scroll in Providers
+- Settings reference: [`.env.example`](.env.example)
+- Deploy to Render: [`../render.yaml`](../render.yaml) (steps in the main README)
+- Deploy to Railway: [`DEPLOY.md`](DEPLOY.md)

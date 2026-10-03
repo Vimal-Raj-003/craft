@@ -1,5 +1,7 @@
 # Render Blueprint: one click creates the PostgreSQL database and the website together.
 # https://render.com/docs/blueprint-spec
+#
+# The website lives in the craft-and-cart/ folder of this repository, so the service sets rootDir.
 databases:
   - name: craftcart-db
     databaseName: craftcart
@@ -11,6 +13,7 @@ services:
   - type: web
     name: craft-and-cart
     runtime: node
+    rootDir: craft-and-cart
     plan: free          # free web services sleep after ~15 min idle and take ~30s to wake up
     region: singapore
     buildCommand: npm ci --include=dev && npm run build
