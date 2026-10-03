@@ -1,0 +1,17 @@
+# Python virtual environments, caches and secrets (never upload)
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+.env.*
+*.pem
+*.key
+
+# Local-only export folder (a duplicate of craft-and-cart used for drag-and-drop uploads)
+upload-to-github/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
