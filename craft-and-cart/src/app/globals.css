@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fff1c9;
+  --bg-2: #ffe6a3;
+  --ink: #3b1206;
+  --ink-dim: #7d4a30;
+  --pink: #e8334f;
+  --violet: #f5a623;
+  --mint: #0e8a57;
+  --amber: #c97700;
+  --glass: rgba(255, 252, 240, 0.62);
+  --glass-line: rgba(122, 29, 0, 0.16);
+  --side: clamp(22px, 2.4vw, 34px); /* width of the kolam side bands */
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg2: var(--bg-2);
+  --color-ink: var(--ink);
+  --color-dim: var(--ink-dim);
+  --color-pink: var(--pink);
+  --color-violet: var(--violet);
+  --color-mint: var(--mint);
+  --color-amber: var(--amber);
+  --font-sans: var(--font-grotesk), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+}
+
+html {
+  background: var(--bg);
+  color-scheme: light;
+}
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+body {
+  /* harvest-morning sky: turmeric glow fading to rice-cream, with a faint pulli (kolam dot) grid */
+  background:
+    radial-gradient(circle, rgba(122,29,0,.13) 1.5px, transparent 2px) 0 0 / 44px 44px,
+    linear-gradient(180deg, #ffd96b 0%, #ffe9a6 18%, #fff3cf 45%, #fff6dc 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-grotesk), system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--pink); color: #fff; }
+
+/* film-grain + vignette overlay for depth */
+body::after {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 90;
+  background:
+    radial-gradient(ellipse at center, transparent 60%, rgba(122,29,0,.18) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.5'/></svg>");
+  opacity: .06;
+  mix-blend-mode: multiply;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, var(--pink), var(--violet) 45%, var(--mint));
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: shift 8s linear infinite;
+}
+@keyframes shift { to { background-position: 200% center; } }
+
+.aurora { position: absolute; inset: 0; overflow: hidden; z-index: -1; }
+.aurora i {
+  position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
+  filter: blur(90px); opacity: .45;
+  animation: drift 22s ease-in-out infinite alternate;
+}
+.aurora i:nth-child(1) { background: var(--violet); top: -15%; left: -10%; }
+.aurora i:nth-child(2) { background: var(--pink); top: 10%; right: -15%; animation-delay: -7s; }
+.aurora i:nth-child(3) { background: var(--mint); bottom: -25%; left: 25%; opacity: .28; animation-delay: -13s; }
+@keyframes drift {
+  to { transform: translate3d(8vw, 6vh, 0) scale(1.15) rotate(25deg); }
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(122,29,0,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122,29,0,.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+}
+
+.btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .9rem 1.6rem; border-radius: 999px; font-weight: 600; letter-spacing: .01em;
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+  cursor: pointer; will-change: transform;
+}
+.btn-primary {
+  background: linear-gradient(110deg, var(--pink), var(--violet));
+  color: #fff; box-shadow: 0 10px 40px -10px var(--pink);
+}
+.btn-primary:hover { box-shadow: 0 14px 50px -8px var(--pink), 0 0 0 1px rgba(255,255,255,.4) inset; }
+.btn-ghost { border: 1px solid var(--glass-line); background: var(--glass); }
+.btn-ghost:hover { border-color: var(--mint); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.input {
+  width: 100%; padding: .85rem 1.1rem; border-radius: 14px; outline: none; color: var(--ink);
+  background: rgba(255,255,255,.7); border: 1px solid var(--glass-line); transition: border-color .2s, box-shadow .2s;
+}
+.input:focus { border-color: var(--violet); box-shadow: 0 0 0 4px rgba(245,166,35,.2); }
+.input::placeholder { color: #b08a70; }
+
+/* custom cursor */
+.cursor-dot, .cursor-ring {
+  position: fixed; top: 0; left: 0; z-index: 100; pointer-events: none; border-radius: 50%;
+  transform: translate3d(-100px,-100px,0);
+}
+.cursor-dot { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: var(--pink); }
+.cursor-ring {
+  width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 1.5px solid rgba(122,29,0,.55);
+  transition: width .25s, height .25s, margin .25s, background .25s, border-color .25s;
+}
+.cursor-ring.hot { width: 70px; height: 70px; margin: -35px 0 0 -35px; background: rgba(232,51,79,.18); border-color: var(--pink); }
+@media (hover: none) { .cursor-dot, .cursor-ring { display: none; } }
+
+/* Temple-gopuram zig-zag border */
+.temple-border {
+  height: 14px;
+  background: conic-gradient(from -45deg at bottom, transparent 90deg, var(--violet) 0 135deg, transparent 0) 0 0 / 28px 14px repeat-x;
+  opacity: .85;
+}
+.temple-border.flip { transform: scaleY(-1); }
+
+.kolam-spin { animation: kolam 80s linear infinite; transform-origin: center; }
+@keyframes kolam { to { transform: rotate(360deg); } }
+
+.marquee { display: flex; width: max-content; animation: marquee 32s linear infinite; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+.float { animation: float 6s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-14px) rotate(3deg); } }
+
+.skeleton { background: linear-gradient(100deg, rgba(122,29,0,.04) 30%, rgba(122,29,0,.1) 50%, rgba(122,29,0,.04) 70%); background-size: 200% 100%; animation: sk 1.4s infinite; }
+@keyframes sk { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- Pongal scene ---------- */
+.sun-rays { animation: spin 60s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sun-glow { animation: pulse-sun 5s ease-in-out infinite; }
+@keyframes pulse-sun { 50% { transform: scale(1.06); opacity: .9; } }
+
+.sway { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 5s ease-in-out infinite alternate; }
+@keyframes sway { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+
+.swing { transform-box: fill-box; transform-origin: 50% 0; animation: swing 3.4s ease-in-out infinite alternate; }
+@keyframes swing { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+
+.foam { transform-box: fill-box; transform-origin: 50% 100%; animation: foam 3.2s ease-in-out infinite; }
+@keyframes foam { 0%,100% { transform: scale(1,.9); } 50% { transform: scale(1.08,1.15); } }
+.drip { animation: drip 3.2s ease-in infinite; }
+@keyframes drip { 0% { transform: translateY(-10px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(70px); opacity: 0; } }
+.bubble { animation: bubble 2.6s ease-out infinite; }
+@keyframes bubble { 0% { transform: translateY(0) scale(.4); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-46px) scale(1); opacity: 0; } }
+.steam { animation: steam 4s ease-out infinite; }
+@keyframes steam { 0% { transform: translateY(0); opacity: 0; } 30% { opacity: .6; } 100% { transform: translateY(-60px) scale(1.4); opacity: 0; } }
+
+.pongal-chip { transform-box: fill-box; transform-origin: 50% 100%; animation: pop 6s ease-in-out infinite; }
+@keyframes pop { 0%, 55%, 100% { transform: scale(0); opacity: 0; } 62%, 92% { transform: scale(1); opacity: 1; } }
+/* ---------- Sunrise scene ---------- */
+.sunrise { animation: sunrise 4s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes sunrise { from { transform: translateY(150px); } to { transform: translateY(0); } }
+.bird { animation: fly 26s linear infinite; }
+@keyframes fly { from { transform: translateX(-120px); } to { transform: translateX(1600px); } }
+.twinkle { animation: twinkle 3s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .35; } }
+
+/* ---------- Kolam side bands: sikku kolam chain (public/kolam-chain.svg) down both sides of the page ---------- */
+.kolam-side {
+  position: fixed; top: 0; bottom: 0; width: var(--side); z-index: 45; pointer-events: none;
+  background: url("/kolam-chain.svg") center top / 100% auto repeat-y;
+}
+.kolam-side.left  { left: 0; }
+.kolam-side.right { right: 0; transform: scaleX(-1); }
+/* gentle heartbeat for the quote banner */
+.heartbeat { animation: heartbeat 1.6s ease-in-out infinite; }
+@keyframes heartbeat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } 45% { transform: scale(1.18); } }
+
+/* ---------- Phones & tablets: lighter effects, steadier text ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (max-width: 767px) {
+  body::after { display: none; }                                   /* film-grain overlay is costly on phones */
+  .aurora i { filter: blur(48px); width: 70vmax; height: 70vmax; } /* big blurs make low-end phones stutter */
+  .glass { backdrop-filter: blur(8px) saturate(1.2); -webkit-backdrop-filter: blur(8px) saturate(1.2); }
+  .btn { padding: .8rem 1.3rem; }
+}
