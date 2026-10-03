@@ -24,5 +24,6 @@ Use a strong, private password on any public site.
 ## More
 
 - Settings reference: [`.env.example`](.env.example)
-- Deploy to Render: [`../render.yaml`](../render.yaml) (steps in the main README)
+- Deploy with Docker on a VPS: [DOCKER.md](DOCKER.md) (compose file, Nginx config, smoke test)
+- Other hosts - Render: [`../render.yaml`](../render.yaml) (steps in the main README)
 - Deploy to Railway: [`DEPLOY.md`](DEPLOY.md)

@@ -1,0 +1,97 @@
+# Craft & Cart: production stack for the Hostinger VPS (craft.jilljill.in).
+#
+#   craft-web  the Next.js website, reachable ONLY from this server at 127.0.0.1:3215 (your Nginx proxies to it)
+#   craft-db   PostgreSQL 16 (Alpine), reachable ONLY by craft-web over a private Docker network; no published port
+#
+# Everything here is namespaced "craft" (containers, network, volume) so it cannot collide with, or touch,
+# your other Docker applications. It does not use ports 80 or 443.
+#
+# Always run it with:  docker compose -p craft -f docker-compose.production.yml --env-file .env.production <command>
+
+services:
+  craft-db:
+    image: postgres:16-alpine
+    container_name: craft-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: craftcart
+      POSTGRES_USER: craftcart
+      POSTGRES_PASSWORD: "${CRAFT_DB_PASSWORD:?Set CRAFT_DB_PASSWORD in .env.production - generate one with: openssl rand -hex 24}"
+    volumes:
+      - craft_db_data:/var/lib/postgresql/data
+    networks:
+      - craft_net
+    # NOTE: there is intentionally NO "ports:" section: PostgreSQL (5432) is not published on the host or the internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U craftcart -d craftcart"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  craft-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: https://craft.jilljill.in
+    image: craft-web:latest
+    container_name: craft-web
+    restart: unless-stopped
+    depends_on:
+      craft-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SITE_URL: https://craft.jilljill.in
+      # the database is reached by its service name over the private network; the password never leaves this file/.env.production
+      DATABASE_URL: "postgres://craftcart:${CRAFT_DB_PASSWORD:?Set CRAFT_DB_PASSWORD in .env.production}@craft-db:5432/craftcart"
+      DATABASE_SSL: "false"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env.production - generate one with: openssl rand -hex 32}"
+      # PhonePe (optional: leave empty and customers use Cash on Delivery)
+      PHONEPE_ENV: "${PHONEPE_ENV:-sandbox}"
+      PHONEPE_CLIENT_ID: "${PHONEPE_CLIENT_ID:-}"
+      PHONEPE_CLIENT_SECRET: "${PHONEPE_CLIENT_SECRET:-}"
+      PHONEPE_CLIENT_VERSION: "${PHONEPE_CLIENT_VERSION:-1}"
+      PHONEPE_WEBHOOK_USER: "${PHONEPE_WEBHOOK_USER:-}"
+      PHONEPE_WEBHOOK_PASS: "${PHONEPE_WEBHOOK_PASS:-}"
+    ports:
+      # host 127.0.0.1:3215  ->  container 3000.  Bound to localhost only: not reachable from the internet except through Nginx.
+      - "127.0.0.1:3215:3000"
+    networks:
+      - craft_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    mem_limit: 768m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  craft_net:
+    name: craft_net
+    driver: bridge
+
+volumes:
+  craft_db_data:
+    name: craft_db_data

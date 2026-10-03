@@ -1,0 +1,7 @@
+# Files used on Linux servers must keep LF line endings.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+*.conf          text eol=lf
+.dockerignore   text eol=lf
+.env.*example   text eol=lf

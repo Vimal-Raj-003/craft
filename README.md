@@ -71,7 +71,7 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 | Auth | `jose` (signed JWT in an httpOnly cookie) and `bcryptjs` |
 | Validation | `zod` on every API route |
 | Payments | PhonePe Payment Gateway (Standard Checkout v2) and Cash on Delivery |
-| Hosting | Works on Vercel, Render (`render.yaml`), Railway or your own Node.js server; see [Deploy it online](#deploy-it-online) |
+| Hosting | Docker on your own VPS behind Nginx (see [Deploy it online](#deploy-it-online)); also runs on any Node.js host |
 
 ## Repository layout
 
@@ -202,60 +202,28 @@ run the seed command again. On an online database it never resets your stock num
 
 ## Deploy it online
 
-### Render (website and database together)
+### Your own VPS with Docker (recommended; used for craft.jilljill.in)
 
-The file [`render.yaml`](render.yaml) describes everything Render needs.
+The full step-by-step runbook is [`craft-and-cart/DOCKER.md`](craft-and-cart/DOCKER.md). In short, the stack is two
+containers on a private Docker network: `craft-web` (the site, published only on `127.0.0.1:3215`) and `craft-db`
+(PostgreSQL 16 Alpine, no published port, data in the `craft_db_data` volume). Your existing Nginx terminates HTTPS and
+proxies `craft.jilljill.in` to `127.0.0.1:3215` (ready-made config: `craft-and-cart/deploy/nginx/craft.jilljill.in.conf`).
 
-1. Push this repository to GitHub (already done if you are reading this there).
-2. Go to <https://dashboard.render.com/blueprint/new?repo=https://github.com/Vimal-Raj-003/craft> and log in with GitHub.
-3. When asked, enter an **`ADMIN_PASSWORD`** (10+ characters, typed only into Render). The session secret is generated for you.
-4. Click **Apply**. Render builds the site and creates the PostgreSQL database (about 5–8 minutes). On every start the site
-   creates or updates the tables and products, then runs.
-5. Open the `.onrender.com` address Render gives you. Then add your PhonePe variables (see above) and set
-   `NEXT_PUBLIC_SITE_URL` to that address.
+```bash
+cd craft-and-cart
+cp .env.production.example .env.production      # then fill in CRAFT_DB_PASSWORD and JWT_SECRET (openssl rand -hex ...)
+docker compose -p craft -f docker-compose.production.yml --env-file .env.production build
+docker compose -p craft -f docker-compose.production.yml --env-file .env.production up -d
+ADMIN_PASSWORD='<10+ characters>' docker compose -p craft -f docker-compose.production.yml --env-file .env.production \
+  run --rm -e ADMIN_PASSWORD craft-web node scripts/db-setup.cjs      # once: tables, products, admin login
+curl -s http://127.0.0.1:3215/api/health                              # {"ok":true}
+```
 
-Notes: Render's free plan puts the site to sleep after about 15 minutes without visitors (the first visit takes ~30 seconds
-to wake it) and its free database is temporary. Choose paid plans before you take real orders.
+`deploy/smoke-test.sh` checks the live site end to end (health, pages, admin sign-in, secure cookie, `/api/auth/me`).
 
-### Vercel (manual setup)
+### Other Node.js hosts
 
-Vercel runs the website but **does not host a database**, so you also need a hosted PostgreSQL (any provider that gives
-you a connection string; the free local database in `.pgdata/` cannot go online).
-
-1. **Create the database** and copy its connection string (use the provider's "pooled" string if it offers one).
-2. **Create the tables and products once**, from the `craft-and-cart` folder on your computer:
-   ```powershell
-   $env:DATABASE_URL = "<your connection string>"
-   $env:DATABASE_SSL = "true"            # most hosted databases require SSL
-   $env:ADMIN_PASSWORD = "<10+ characters; this becomes the admin login>"
-   npm install
-   npm run db:setup
-   ```
-3. **Create the Vercel project** from this repository and set **Root Directory = `craft-and-cart`** (the website is in that
-   sub-folder). Framework: Next.js. Build command `npm run build`, Node.js 20 or 22. (Or run `npx vercel` inside `craft-and-cart`.)
-4. **Add environment variables** (Project → Settings → Environment Variables, for *Production*):
-
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | your connection string |
-   | `DATABASE_SSL` | `true` if your database needs SSL |
-   | `JWT_SECRET` | a long random string (40+ characters) |
-   | `NEXT_PUBLIC_SITE_URL` | your final address, e.g. `https://shop.example.com` |
-   | `PHONEPE_*` | add later, when you have PhonePe credentials (see "How payments work") |
-
-   `ADMIN_PASSWORD` is only used in step 2; it is not needed on Vercel.
-5. **Add your domain/subdomain** (Project → Settings → Domains). Vercel shows the DNS record to create (normally a `CNAME` to
-   `cname.vercel-dns.com`); HTTPS is automatic. Then **redeploy** once so `NEXT_PUBLIC_SITE_URL` takes effect.
-6. **Check it:** open the home page, the shop and a product, place a Cash-on-Delivery test order, and sign in at `/login`
-   with `admin@craftandcart.local` and your `ADMIN_PASSWORD`.
-
-Good to know: choose the Vercel *Function Region* closest to your database (Project → Settings → Functions); Vercel's free
-"Hobby" plan is for personal, non-commercial use, so a real shop needs a paid plan; until PhonePe keys are added, "Pay online"
-shows a friendly message and customers use Cash on Delivery.
-
-### Your own server (VPS / any Node.js host)
-
-Nothing in the code is tied to Vercel. On a server with Node.js 20+ and PostgreSQL:
+Nothing in the code is tied to a particular host. On any server with Node.js 20+ and PostgreSQL:
 
 ```bash
 cd craft-and-cart
@@ -266,13 +234,9 @@ npm run build
 npm start                                                # listens on port 3000 (set PORT to change)
 ```
 
-Put it behind a reverse proxy that provides HTTPS (nginx, Caddy, Apache) and keep it running with `pm2` or `systemd`.
-
-### Railway or another host
-
-[`craft-and-cart/DEPLOY.md`](craft-and-cart/DEPLOY.md) has a step-by-step Railway guide. Any host that can run Node.js 20+
-and PostgreSQL works the same way: set the environment variables above, build with `npm run build`, start with `npm start`,
-and run `npm run db:setup` once against the online database.
+Put it behind a reverse proxy that provides HTTPS and keep it running with `pm2` or `systemd`.
+[`render.yaml`](render.yaml) (Render) and [`craft-and-cart/DEPLOY.md`](craft-and-cart/DEPLOY.md) (Railway) are also
+available as alternatives.
 
 ## Security notes
 

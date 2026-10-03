@@ -5,7 +5,9 @@ import { pool } from "./db";
 const COOKIE = "cc_session";
 const secret = () => {
   const s = process.env.JWT_SECRET;
-  if (!s && process.env.NODE_ENV === "production") throw new Error("JWT_SECRET must be set in production");
+  if (process.env.NODE_ENV === "production" && (!s || s.length < 32)) {
+    throw new Error("JWT_SECRET must be set to a random string of at least 32 characters in production");
+  }
   return new TextEncoder().encode(s ?? "dev-secret-change-me");
 };
 

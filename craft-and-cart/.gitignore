@@ -63,3 +63,4 @@ __pycache__/
 
 # the template with no real values is safe to commit
 !.env.example
+!.env.production.example

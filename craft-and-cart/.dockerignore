@@ -1,0 +1,29 @@
+# Keep the build context small and keep secrets out of the image.
+node_modules
+.next
+.pgdata
+.git
+.gitignore
+
+# secrets and local settings (never copied into an image)
+.env
+.env.*
+!.env.production.example
+
+# logs and editor/OS noise
+*.log
+*.err
+.DS_Store
+Thumbs.db
+tsconfig.tsbuildinfo
+
+# not needed to build or run
+docs
+DEPLOY.md
+DOCKER.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+deploy
+vercel.json
+.vercelignore
