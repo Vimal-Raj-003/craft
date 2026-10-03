@@ -7,7 +7,11 @@ export const pool =
   new Pool({
     connectionString:
       process.env.DATABASE_URL ?? "postgres://craftcart:craftcart_local@localhost:54329/craftcart",
-    max: 10,
+    // Serverless hosts (Vercel) start many short-lived copies of the site, each with its own pool.
+    // Keep each pool tiny and let idle connections go so a small hosted database is never overwhelmed.
+    max: process.env.VERCEL ? 3 : 10,
+    idleTimeoutMillis: process.env.VERCEL ? 10_000 : 30_000,
+    connectionTimeoutMillis: 15_000,
     ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
   });
 

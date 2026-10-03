@@ -1,0 +1,6 @@
+# files the Vercel CLI should not upload
+.pgdata
+docs
+*.log
+*.err
+DEPLOY.md
