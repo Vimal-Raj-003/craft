@@ -5,7 +5,7 @@ import ProductCard from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { getProduct, listProducts, listReviews } from "@/lib/db";
 import { formatINR } from "@/lib/money";
-import { getActiveOffer } from "@/lib/offer";
+import { getActiveOffers } from "@/lib/offer";
 import OfferBanner from "@/components/OfferBanner";
 import ProductArt from "@/components/ProductArt";
 
@@ -19,12 +19,12 @@ export async function generateMetadata({ params }: PageProps<"/product/[slug]">)
 export default async function ProductPage({ params }: PageProps<"/product/[slug]">) {
   const p = await getProduct((await params).slug);
   if (!p) notFound();
-  const [reviews, related, offer] = await Promise.all([
+  const [reviews, related, offers] = await Promise.all([
     listReviews(p.id),
     listProducts({ category: p.category_slug ?? undefined }),
-    getActiveOffer(),
+    getActiveOffers(),
   ]);
-  const isPromo = offer?.productId === p.id;
+  const isPromo = offers.some((o) => o.productId === p.id);
 
   return (
     <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-32 sm:px-6 sm:pt-36">
@@ -70,7 +70,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
       <section className="mt-24">
         <h2 className="text-3xl font-bold">You might also love</h2>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3">
-          {related.filter((r) => r.id !== p.id).slice(0, 3).map((r, i) => <ProductCard key={r.id} p={r} index={i} promo={r.id === offer?.productId} />)}
+          {related.filter((r) => r.id !== p.id).slice(0, 3).map((r, i) => <ProductCard key={r.id} p={r} index={i} promoPaise={offers.find((o) => o.productId === r.id)?.offerPaise} />)}
         </div>
       </section>
     </div>

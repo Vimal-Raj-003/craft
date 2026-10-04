@@ -13,8 +13,12 @@ export default function CartDrawer() {
   const subtotal = mounted ? cartSubtotal(lines) : 0;
   // Preview of the first-order offer (display only; the server prices the real order at checkout)
   const offerState = useOffer();
-  const promoLine = offerState?.eligible && offerState.offer ? lines.find((l) => l.productId === offerState.offer!.productId) : undefined;
-  const discount = mounted && promoLine && offerState?.offer ? Math.max(0, promoLine.pricePaise - offerState.offer.offerPaise) : 0;
+  const discount = !mounted || !offerState?.eligible
+    ? 0
+    : offerState.offers.reduce((sum, o) => {
+        const line = lines.find((l) => l.productId === o.productId);
+        return line ? sum + Math.max(0, line.pricePaise - o.offerPaise) : sum; // one unit of each promotional product
+      }, 0);
   const payable = subtotal - discount;
   const progress = Math.min(payable / FREE_SHIPPING_OVER, 1);
 
@@ -83,7 +87,7 @@ export default function CartDrawer() {
             <div className="mt-5 space-y-2 border-t border-[#7a1d00]/15 pt-5 text-sm">
               <div className="flex justify-between text-dim"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
               {discount > 0 && (
-                <div className="flex justify-between text-mint"><span>First order ₹1 product discount <span className="text-xs text-dim">(pay online)</span></span><span>−{formatINR(discount)}</span></div>
+                <div className="flex justify-between text-mint"><span>First order promo discount <span className="text-xs text-dim">(pay online)</span></span><span>−{formatINR(discount)}</span></div>
               )}
               <div className="flex justify-between text-dim"><span>Shipping</span><span>{shippingFor(payable) === 0 ? "Free" : formatINR(shippingFor(payable))}</span></div>
               <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatINR(payable + shippingFor(payable))}</span></div>

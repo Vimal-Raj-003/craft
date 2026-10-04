@@ -180,7 +180,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS image_type TEXT;
 UPDATE products SET sku = 'CC-' || lpad(id::text, 4, '0') WHERE sku IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS products_sku_key ON products(sku);
 
--- Which ONE product is the Rs 1 first-order product. At most one row can be active.
+-- The promotional first-order products: slot 1 = the Rs 1 product, slot 2 = the Rs 2 product (at most one active per slot).
 CREATE TABLE IF NOT EXISTS first_order_offer (
   id                SERIAL PRIMARY KEY,
   product_id        INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -189,7 +189,6 @@ CREATE TABLE IF NOT EXISTS first_order_offer (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_one_active ON first_order_offer ((true)) WHERE active;
 
 -- One row per customer who has taken part in the offer.
 --   held     = an online order with the offer price exists and is waiting for payment
@@ -226,3 +225,16 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS offer_status TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS promo BOOLEAN NOT NULL DEFAULT false;
 
 INSERT INTO categories(slug, name, blurb) VALUES ('home', 'Home', 'Cosy crochet for your home.') ON CONFLICT (slug) DO NOTHING;
+
+-- Two promotional products. Existing single-offer rows become slot 1. Each slot has at most one active product, and a product
+-- can hold only one active slot.
+ALTER TABLE first_order_offer ADD COLUMN IF NOT EXISTS slot INTEGER;
+UPDATE first_order_offer SET slot = CASE WHEN offer_price_paise >= 200 THEN 2 ELSE 1 END WHERE slot IS NULL;
+ALTER TABLE first_order_offer ALTER COLUMN slot SET NOT NULL;
+ALTER TABLE first_order_offer DROP CONSTRAINT IF EXISTS first_order_offer_slot_check;
+ALTER TABLE first_order_offer ADD CONSTRAINT first_order_offer_slot_check CHECK (slot IN (1,2));
+DROP INDEX IF EXISTS first_order_offer_one_active;
+CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_slot_active ON first_order_offer (slot) WHERE active;
+CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_product_active ON first_order_offer (product_id) WHERE active;
+-- the normal price of every ordered unit, so an order always shows "normal price -> offer price"
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS normal_price_paise INTEGER;

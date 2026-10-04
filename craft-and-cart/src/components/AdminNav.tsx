@@ -8,7 +8,7 @@ const TABS = [
   ["/admin/customers", "Customers"],
   ["/admin/payments", "Payments"],
   ["/admin/products", "Products"],
-  ["/admin/offer", "₹1 Offer"],
+  ["/admin/offer", "First Order Offer"],
 ] as const;
 
 export default function AdminNav() {

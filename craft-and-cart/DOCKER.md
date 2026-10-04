@@ -118,7 +118,7 @@ After `git pull`, `craft build` and the schema upgrade (`docker exec -i craft-db
 craft run --rm craft-web node scripts/add-catalog.cjs
 ```
 
-It only **inserts** missing products (existing products, prices, stock and photos are never changed), adds the "Home" category, and, only if no offer has ever been configured, makes the Strawberry Crochet Keychain the ₹1 first-order product. Products whose photo is missing are added inactive. Photos and prices can then be changed in the Super Admin panel (Products), and the ₹1 product under "₹1 Offer". Photo credits: `public/products/CREDITS.md`.
+It only **inserts** missing products (existing products, prices, stock and photos are never changed), adds the "Home" category, and sets the default first-order promotional products (Strawberry Crochet Keychain at ₹1, Crochet Heart Gift at ₹2) for any slot that was never configured. Products whose photo is missing are added inactive. Photos and prices can then be changed in the Super Admin panel (Products), and the ₹1 product under "₹1 Offer". Photo credits: `public/products/CREDITS.md`.
 
 ## Turning on Razorpay (online payments)
 

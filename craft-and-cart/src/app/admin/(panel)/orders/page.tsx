@@ -34,7 +34,7 @@ export default async function AdminOrders({ searchParams }: PageProps<"/admin/or
                 <td className="p-4 font-mono"><Link className="underline" href={`/admin/orders/${o.id}`}>{o.id.slice(0, 8)}</Link></td>
                 <td>{o.name}<br /><span className="text-xs text-dim">{o.email}</span></td>
                 <td className="max-w-[220px] text-dim">{o.items}</td>
-                <td>{formatINR(o.total_paise)}{o.discount_paise > 0 && <><br /><span className="text-xs text-mint">₹1 offer −{formatINR(o.discount_paise)}{o.offer_status ? ` · ${o.offer_status}` : ""}</span></>}</td>
+                <td>{formatINR(o.total_paise)}{o.discount_paise > 0 && <><br /><span className="text-xs text-mint">promo −{formatINR(o.discount_paise)}{o.offer_status ? ` · ${o.offer_status}` : ""}</span></>}</td>
                 <td><StatusBadge value={o.payment_status} /><br /><span className="text-xs text-dim">{o.provider === "cod" ? "COD" : "Razorpay"}</span></td>
                 <td className="whitespace-nowrap text-dim">{new Date(o.created_at).toLocaleDateString("en-IN")}</td>
                 <td className="pr-4"><OrderStatus id={o.id} status={o.status} /></td>

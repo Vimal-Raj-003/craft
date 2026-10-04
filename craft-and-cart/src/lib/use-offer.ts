@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 export type OfferProduct = {
   productId: number;
+  slot: number;
   slug: string;
   name: string;
   image_url: string | null;
@@ -13,9 +14,9 @@ export type OfferProduct = {
   normalPaise: number;
   offerPaise: number;
 };
-export type OfferState = { offer: OfferProduct | null; signedIn: boolean; eligible: boolean; reason: string | null };
+export type OfferState = { offers: OfferProduct[]; signedIn: boolean; eligible: boolean; reason: string | null };
 
-/** The current ₹1 first-order product and whether this visitor can use it. Display only: the server prices every order. */
+/** The current first-order promotional products and whether this visitor can use them. Display only: the server prices every order. */
 export function useOffer() {
   const [state, setState] = useState<OfferState | null>(null);
   useEffect(() => {

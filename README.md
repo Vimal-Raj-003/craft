@@ -52,7 +52,7 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 **Accounts and admin**
 - Customer sign-up (name, email, phone, password), sign-in, sign-out and forgot/reset password (passwords hashed with bcrypt, session in an httpOnly cookie).
 - `/account`: My orders (with order and payment status), order details, profile, saved addresses and password change. A customer can only ever see their own data.
-- **₹1 First Order Product offer:** one selected product (default: Strawberry Crochet Keychain) costs ₹1 for ONE unit in a signed-in customer's first order, paid online. Priced only on the server; once per customer account and phone number; a failed payment confirmed by Razorpay uses the offer up; a cancelled order restores it. The Super Admin chooses the product at `/admin/offer`.
+- **First Order offers (₹1 and ₹2 products):** two selected products (default: Strawberry Crochet Keychain at ₹1 and Crochet Heart Gift at ₹2). In a signed-in customer's FIRST order, ONE unit of each costs its promo price; every other unit and product stays at normal price. Priced only on the server; online payment only; once per customer account and phone number; a failed payment confirmed by Razorpay uses the offer up; a cancelled order restores it. The Super Admin chooses the two products at /admin/offer.
 - Super Admin panel (`/admin/login`): dashboard, searchable orders with status updates, customers and their order history, and a payments ledger with Razorpay IDs. Role-checked on the server for every page and API call.
 - Newsletter sign-up and custom-order requests are saved in the database.
 

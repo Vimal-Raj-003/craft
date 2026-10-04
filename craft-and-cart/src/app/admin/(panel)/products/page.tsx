@@ -8,7 +8,7 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
   const q = (typeof sp.q === "string" ? sp.q : "").trim().slice(0, 80);
   const { rows } = await pool.query(
     `SELECT p.id, p.sku, p.name, p.price_paise, p.stock, p.active, p.image_url, c.name AS category,
-            EXISTS (SELECT 1 FROM first_order_offer o WHERE o.product_id=p.id AND o.active) AS promo
+            (SELECT o.offer_price_paise FROM first_order_offer o WHERE o.product_id=p.id AND o.active LIMIT 1) AS promo_paise
        FROM products p LEFT JOIN categories c ON c.id=p.category_id
       WHERE ($1::text = '' OR p.name ILIKE '%' || $1 || '%' OR p.sku ILIKE '%' || $1 || '%')
       ORDER BY p.active DESC, p.id DESC`,
@@ -36,7 +36,7 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
                       {p.image_url && <Image src={p.image_url} alt="" fill sizes="48px" className="object-cover" unoptimized />}
                     </span>
                     <span className="font-medium underline">{p.name}</span>
-                    {p.promo && <span className="rounded-full bg-gradient-to-r from-pink to-violet px-2 py-0.5 text-xs font-bold text-white">₹1 offer</span>}
+                    {p.promo_paise != null && <span className="rounded-full bg-gradient-to-r from-pink to-violet px-2 py-0.5 text-xs font-bold text-white">First order {formatINR(p.promo_paise)}</span>}
                   </Link>
                 </td>
                 <td className="font-mono text-xs">{p.sku}</td>

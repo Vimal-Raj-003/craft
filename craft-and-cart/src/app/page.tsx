@@ -4,7 +4,7 @@ import ProductCard from "@/components/ProductCard";
 import CustomForm from "@/components/CustomForm";
 import { Reveal } from "@/components/Reveal";
 import { listProducts, listCategories } from "@/lib/db";
-import { getActiveOffer } from "@/lib/offer";
+import { getActiveOffers } from "@/lib/offer";
 import OfferBanner from "@/components/OfferBanner";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ const STEPS = [
 ];
 
 export default async function Home() {
-  const [featured, categories, offer] = await Promise.all([listProducts({ featured: true }), listCategories(), getActiveOffer()]);
+  const [featured, categories, offers] = await Promise.all([listProducts({ featured: true }), listCategories(), getActiveOffers()]);
 
   return (
     <>
@@ -70,7 +70,7 @@ export default async function Home() {
           <Link href="/shop" className="btn btn-ghost !min-h-11">View all →</Link>
         </Reveal>
         <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-12 sm:gap-6 lg:grid-cols-3">
-          {featured.slice(0, 6).map((p, i) => <ProductCard key={p.id} p={p} index={i} promo={p.id === offer?.productId} />)}
+          {featured.slice(0, 6).map((p, i) => <ProductCard key={p.id} p={p} index={i} promoPaise={offers.find((o) => o.productId === p.id)?.offerPaise} />)}
         </div>
       </section>
 

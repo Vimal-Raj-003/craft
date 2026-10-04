@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { listProducts, listCategories } from "@/lib/db";
-import { getActiveOffer } from "@/lib/offer";
+import { getActiveOffers } from "@/lib/offer";
 import OfferBanner from "@/components/OfferBanner";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export default async function Shop({ searchParams }: PageProps<"/shop">) {
   const category = typeof sp.category === "string" ? sp.category : undefined;
   const sort = typeof sp.sort === "string" ? sp.sort : undefined;
   const q = typeof sp.q === "string" ? sp.q : undefined;
-  const [products, categories, offer] = await Promise.all([listProducts({ category, sort, q }), listCategories(), getActiveOffer()]);
+  const [products, categories, offers] = await Promise.all([listProducts({ category, sort, q }), listCategories(), getActiveOffers()]);
 
   const href = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -48,7 +48,7 @@ export default async function Shop({ searchParams }: PageProps<"/shop">) {
         <p className="mt-24 text-center text-dim">Nothing matched. Try another search 🧶</p>
       ) : (
         <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-6 lg:grid-cols-3">
-          {products.map((p, i) => <ProductCard key={p.id} p={p} index={i} promo={p.id === offer?.productId} />)}
+          {products.map((p, i) => <ProductCard key={p.id} p={p} index={i} promoPaise={offers.find((o) => o.productId === p.id)?.offerPaise} />)}
         </div>
       )}
     </div>

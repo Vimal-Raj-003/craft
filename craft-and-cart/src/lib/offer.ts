@@ -2,14 +2,16 @@ import type { Pool, PoolClient } from "pg";
 import { pool } from "./db";
 import { shippingFor } from "./money";
 
-// "First order Rs 1 product": ONE selected product costs the offer price (Rs 1) for ONE unit in a customer's first
-// order. Everything here runs on the server; the browser never sends or decides a price.
+// "First order promotional products": up to TWO selected products (slot 1 = the ₹1 product, slot 2 = the ₹2 product).
+// In a signed-in customer's FIRST order, ONE unit of each promotional product costs its promo price; every other unit
+// and every other product stays at normal price. Everything here runs on the server; the browser never decides a price.
 
 export type Q = Pool | PoolClient;
 const run = (q: Q, text: string, params?: unknown[]) => (q as Pool).query(text, params);
 
 export type ActiveOffer = {
   offerId: number;
+  slot: number;
   productId: number;
   slug: string;
   name: string;
@@ -23,17 +25,17 @@ export type ActiveOffer = {
   stock: number;
 };
 
-/** The single active promotional product (must be an active, in-stock product that is priced above the offer price). */
-export async function getActiveOffer(q: Q = pool): Promise<ActiveOffer | null> {
+/** The active promotional products (each must be an active, in-stock product priced above its promo price), by slot. */
+export async function getActiveOffers(q: Q = pool): Promise<ActiveOffer[]> {
   const { rows } = await run(
     q,
-    `SELECT o.id AS "offerId", p.id AS "productId", p.slug, p.name, p.image_url, p.emoji, p.hue_a, p.hue_b, p.colors, p.price_paise AS "normalPaise",
-            o.offer_price_paise AS "offerPaise", p.stock
+    `SELECT o.id AS "offerId", o.slot, p.id AS "productId", p.slug, p.name, p.image_url, p.emoji, p.hue_a, p.hue_b, p.colors,
+            p.price_paise AS "normalPaise", o.offer_price_paise AS "offerPaise", p.stock
        FROM first_order_offer o JOIN products p ON p.id = o.product_id
       WHERE o.active AND p.active AND p.stock >= 1 AND p.price_paise > o.offer_price_paise
-      LIMIT 1`,
+      ORDER BY o.slot`,
   );
-  return (rows[0] as ActiveOffer | undefined) ?? null;
+  return rows as ActiveOffer[];
 }
 
 /** Last 10 digits of a phone number, used to allow one offer per phone. */
@@ -46,10 +48,11 @@ export type Reason = "guest" | "used" | "failed" | "previous_order" | "phone" | 
 export type Eligibility = { eligible: boolean; reason: Reason | null; heldOrderId: string | null };
 
 /**
- * Is this signed-in customer allowed the offer right now?
+ * Is this signed-in customer allowed the first-order offer right now?
  *  - not already used / spent by a failed payment (a cancelled order restores it)
  *  - FIRST order only: no earlier confirmed/processing/shipped/delivered order
  *  - none of their phone numbers (account + delivery) belongs to another customer's active claim
+ * One claim covers the whole first order, i.e. both promotional products together.
  */
 export async function checkEligibility(q: Q, userId: string, deliveryPhone?: string | null): Promise<Eligibility> {
   const { rows: claim } = await run(q, "SELECT status, order_id FROM offer_claims WHERE user_id=$1", [userId]);
@@ -81,13 +84,13 @@ export async function checkEligibility(q: Q, userId: string, deliveryPhone?: str
 // Pricing
 
 export type QuoteItem = { productId: number; qty: number; color?: string };
-export type PricedLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; promo: boolean };
+export type PricedLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; normalPaise: number; promo: boolean };
 export type ProductRow = { id: number; name: string; price_paise: number; stock: number };
 
 export type OfferInfo = {
-  product: { id: number; slug: string; name: string; image_url: string | null; normalPaise: number; offerPaise: number } | null;
+  products: { id: number; slot: number; slug: string; name: string; image_url: string | null; normalPaise: number; offerPaise: number; applied: boolean }[];
   eligible: boolean;
-  applied: boolean;
+  applied: boolean; // at least one promotional price was applied
   reason: Reason | null;
 };
 
@@ -98,30 +101,34 @@ export type Quote =
       lines: PricedLine[];
       products: Map<number, ProductRow>;
       subtotal: number; // normal prices
-      discount: number;
+      discount: number; // total of all promotional discounts
       shipping: number; // existing rule, applied to what is actually charged for the items
       total: number;
-      promo: ActiveOffer | null; // set only when the discount was applied
+      promos: ActiveOffer[]; // the promotional products whose price was applied
       offer: OfferInfo;
       eligibility: Eligibility;
     };
 
-/** Splits the cart into priced lines. Only ONE unit of the promo product is discounted; every other unit and item is normal price. */
-export function priceItems(items: QuoteItem[], byId: Map<number, ProductRow>, promo: ActiveOffer | null) {
+/**
+ * Splits the cart into priced lines. For each promotional product in the cart only ONE unit gets the promo price;
+ * every other unit and every other item is normal price.
+ */
+export function priceItems(items: QuoteItem[], byId: Map<number, ProductRow>, promos: ActiveOffer[]) {
   const lines: PricedLine[] = [];
   let subtotal = 0;
   let discount = 0;
-  let promoUsed = false;
+  const used = new Set<number>();
   for (const it of items) {
     const p = byId.get(it.productId)!;
     subtotal += p.price_paise * it.qty;
-    if (promo && !promoUsed && it.productId === promo.productId) {
-      promoUsed = true;
-      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: 1, unitPaise: promo.offerPaise, promo: true });
-      discount = p.price_paise - promo.offerPaise;
-      if (it.qty > 1) lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty - 1, unitPaise: p.price_paise, promo: false });
+    const promo = promos.find((o) => o.productId === it.productId);
+    if (promo && !used.has(promo.productId)) {
+      used.add(promo.productId);
+      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: 1, unitPaise: promo.offerPaise, normalPaise: p.price_paise, promo: true });
+      discount += p.price_paise - promo.offerPaise;
+      if (it.qty > 1) lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty - 1, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false });
     } else {
-      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty, unitPaise: p.price_paise, promo: false });
+      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false });
     }
   }
   return { lines, subtotal, discount };
@@ -146,20 +153,20 @@ export async function computeQuote(
     if (p.stock < (wanted.get(it.productId) ?? it.qty)) return { ok: false, error: `Only ${p.stock} left of ${p.name}`, status: 409 };
   }
 
-  const offer = await getActiveOffer(q);
-  let eligibility: Eligibility = { eligible: false, reason: offer ? "guest" : "no_offer", heldOrderId: null };
-  if (offer && opts.userId) eligibility = await checkEligibility(q, opts.userId, opts.phone);
+  const offers = await getActiveOffers(q);
+  let eligibility: Eligibility = { eligible: false, reason: offers.length ? "guest" : "no_offer", heldOrderId: null };
+  if (offers.length && opts.userId) eligibility = await checkEligibility(q, opts.userId, opts.phone);
 
+  const inCart = offers.filter((o) => opts.items.some((i) => i.productId === o.productId));
   let reason: Reason | null = eligibility.reason;
-  let apply = false;
-  if (offer && opts.userId && eligibility.eligible) {
+  let promos: ActiveOffer[] = [];
+  if (offers.length && opts.userId && eligibility.eligible) {
     if (opts.method !== "online") reason = "online_only";
-    else if (!opts.items.some((i) => i.productId === offer.productId)) reason = "not_in_cart";
-    else apply = true;
+    else if (!inCart.length) reason = "not_in_cart";
+    else promos = inCart;
   }
 
-  const promo = apply ? offer : null;
-  const { lines, subtotal, discount } = priceItems(opts.items, byId, promo);
+  const { lines, subtotal, discount } = priceItems(opts.items, byId, promos);
   const shipping = shippingFor(subtotal - discount);
   return {
     ok: true,
@@ -169,11 +176,14 @@ export async function computeQuote(
     discount,
     shipping,
     total: subtotal - discount + shipping,
-    promo,
+    promos,
     offer: {
-      product: offer ? { id: offer.productId, slug: offer.slug, name: offer.name, image_url: offer.image_url, normalPaise: offer.normalPaise, offerPaise: offer.offerPaise } : null,
+      products: offers.map((o) => ({
+        id: o.productId, slot: o.slot, slug: o.slug, name: o.name, image_url: o.image_url,
+        normalPaise: o.normalPaise, offerPaise: o.offerPaise, applied: promos.some((p) => p.productId === o.productId),
+      })),
       eligible: eligibility.eligible,
-      applied: apply,
+      applied: promos.length > 0,
       reason,
     },
     eligibility,
@@ -186,7 +196,7 @@ export async function computeQuote(
 const event = (q: Q, userId: string | null, orderId: string | null, name: string, detail?: string) =>
   run(q, "INSERT INTO offer_events(user_id,order_id,event,detail) VALUES($1,$2,$3,$4)", [userId, orderId, name, detail ?? null]);
 
-/** Checkout created an online order at the offer price: the customer's offer is now held for that order. */
+/** Checkout created an online order at promotional prices: the customer's first-order offer is now held for that order. */
 export async function holdOffer(client: PoolClient, userId: string, orderId: string, deliveryPhone: string) {
   const key = phoneKey(deliveryPhone);
   const { rows } = await run(client, "SELECT status, order_id FROM offer_claims WHERE user_id=$1 FOR UPDATE", [userId]);

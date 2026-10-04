@@ -99,20 +99,20 @@ export async function POST(req: Request) {
     const o = await client.query(
       `INSERT INTO orders(user_id,email,name,phone,address,subtotal_paise,shipping_paise,total_paise,payment_method,idempotency_key,discount_paise,promo_product_id)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-      [session.id, session.email, b.name, b.phone, b.address, q.subtotal, q.shipping, q.total, b.paymentMethod, fingerprint, q.discount, q.promo?.productId ?? null],
+      [session.id, session.email, b.name, b.phone, b.address, q.subtotal, q.shipping, q.total, b.paymentMethod, fingerprint, q.discount, q.promos[0]?.productId ?? null],
     );
     orderId = o.rows[0].id;
     for (const l of q.lines) {
       await client.query(
-        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise,promo) VALUES($1,$2,$3,$4,$5,$6,$7)",
-        [orderId, l.productId, l.name, l.color, l.qty, l.unitPaise, l.promo],
+        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise,promo,normal_price_paise) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+        [orderId, l.productId, l.name, l.color, l.qty, l.unitPaise, l.promo, l.normalPaise],
       );
     }
     await client.query(
       "INSERT INTO payments(order_id,user_id,provider,status,amount_paise) VALUES($1,$2,$3,'pending',$4)",
       [orderId, session.id, b.paymentMethod === "cod" ? "cod" : "razorpay", q.total],
     );
-    if (q.promo) await holdOffer(client, session.id, orderId, b.phone);
+    if (q.promos.length) await holdOffer(client, session.id, orderId, b.phone);
     if (b.saveAddress) {
       const exists = await client.query("SELECT count(*)::int AS n FROM addresses WHERE user_id=$1", [session.id]);
       await client.query(

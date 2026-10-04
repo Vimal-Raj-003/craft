@@ -30,7 +30,7 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
           <tbody>
             {o.items.map((i, n) => (
               <tr key={n} className="border-t border-[#7a1d00]/15">
-                <td className="p-4">{i.name}{i.color && <span className="text-dim"> · {i.color}</span>}{i.promo && <b className="ml-2 rounded-full bg-mint/15 px-2 py-0.5 text-xs text-mint">₹1 offer</b>}</td>
+                <td className="p-4">{i.name}{i.color && <span className="text-dim"> · {i.color}</span>}{i.promo && <b className="ml-2 rounded-full bg-mint/15 px-2 py-0.5 text-xs text-mint">offer price</b>}</td>
                 <td>{i.qty}</td>
                 <td>{formatINR(i.price_paise)}</td>
                 <td className="pr-4 text-right">{formatINR(i.price_paise * i.qty)}</td>
@@ -39,7 +39,7 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
           </tbody>
           <tfoot className="border-t border-[#7a1d00]/15">
             <tr><td className="px-4 pt-3 text-dim" colSpan={3}>{o.discount_paise > 0 ? "Original total" : "Subtotal"}</td><td className="pr-4 pt-3 text-right">{formatINR(o.subtotal_paise)}</td></tr>
-            {o.discount_paise > 0 && <tr><td className="px-4 text-mint" colSpan={3}>First Order ₹1 Product Discount</td><td className="pr-4 text-right text-mint">−{formatINR(o.discount_paise)}</td></tr>}
+            {o.discount_paise > 0 && <tr><td className="px-4 text-mint" colSpan={3}>First Order Promo Discount</td><td className="pr-4 text-right text-mint">−{formatINR(o.discount_paise)}</td></tr>}
             <tr><td className="px-4 text-dim" colSpan={3}>Shipping</td><td className="pr-4 text-right">{o.shipping_paise ? formatINR(o.shipping_paise) : "Free"}</td></tr>
             <tr className="font-bold"><td className="px-4 pb-4 pt-1" colSpan={3}>{o.discount_paise > 0 ? "Final payable" : "Total"}</td><td className="pr-4 pb-4 pt-1 text-right">{formatINR(o.total_paise)}</td></tr>
           </tfoot>
@@ -47,23 +47,28 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
       </div>
 
       {(o.discount_paise > 0 || o.offer_status) && (() => {
-        const promo = o.items.find((i) => i.promo);
+        const promos = o.items.filter((i) => i.promo);
         const label: Record<string, string> = { held: "Reserved for this order (payment pending)", used: "Used", failed: "Used up by a failed payment attempt", restored: "Restored after cancellation", released: "Released (replaced by a newer order)" };
         return (
           <div className="glass rounded-3xl p-5 text-sm sm:p-7">
-            <h2 className="text-lg font-semibold">₹1 First Order offer</h2>
+            <h2 className="text-lg font-semibold">First Order offer</h2>
             <dl className="mt-3 space-y-1.5">
-              {promo && <div className="flex justify-between gap-4"><dt className="text-dim">Product</dt><dd className="text-right">{promo.name}</dd></div>}
-              {promo && <div className="flex justify-between gap-4"><dt className="text-dim">Normal price</dt><dd>{formatINR(promo.price_paise + o.discount_paise)}</dd></div>}
-              {promo && <div className="flex justify-between gap-4"><dt className="text-dim">Offer price</dt><dd>{formatINR(promo.price_paise)}</dd></div>}
-              <div className="flex justify-between gap-4"><dt className="text-dim">Discount</dt><dd>{formatINR(o.discount_paise)}</dd></div>
+              {promos.map((p, i) => {
+                const normal = p.normal_price_paise ?? p.price_paise + (promos.length === 1 ? o.discount_paise : 0);
+                return (
+                  <div key={i} className="flex justify-between gap-4">
+                    <dt className="text-dim">{p.name}</dt>
+                    <dd className="text-right">Normal {formatINR(normal)} → Offer <b>{formatINR(p.price_paise)}</b></dd>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between gap-4"><dt className="text-dim">Total discount</dt><dd>{formatINR(o.discount_paise)}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-dim">Final order amount</dt><dd>{formatINR(o.total_paise)}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-dim">Offer status</dt><dd className="text-right">{o.offer_status ? (label[o.offer_status] ?? o.offer_status) : "—"}</dd></div>
             </dl>
           </div>
         );
       })()}
-
       <div className="grid gap-6 md:grid-cols-2">
         <div className="glass rounded-3xl p-5 text-sm sm:p-7">
           <h2 className="text-lg font-semibold">Delivery</h2>
