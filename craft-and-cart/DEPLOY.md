@@ -35,7 +35,7 @@ In the Railway dashboard, open the project:
 | `JWT_SECRET` | a long random string, 40+ characters (keep it secret and never change it casually) |
 | `NEXT_PUBLIC_SITE_URL` | your final link, e.g. `https://craft-and-cart.up.railway.app` (fill in after step 5) |
 
-Add the `PHONEPE_*` variables later, when you have PhonePe credentials (see README.md).
+Add the `RAZORPAY_*` variables later, when you have Razorpay keys (see README.md and DOCKER.md).
 
 ### 4. Upload and deploy the website
 ```
@@ -64,15 +64,7 @@ Online databases get **no sample reviews** and your stock numbers are never rese
 ### 7. Check it
 Open your link, browse the shop, place a Cash-on-Delivery test order, log in at `/login` as the admin.
 
-## Taking online payments (PhonePe)
-Until the `PHONEPE_*` variables are set, **"Pay online" is switched off on the live site** (customers see a
-message and can use Cash on Delivery). Add your PhonePe credentials, set `PHONEPE_ENV=production`, and add the
-webhook `https://<your-link>/api/webhooks/phonepe` in the PhonePe dashboard. Full details: README.md.
-
-## Updating the site later
-Change the code, then run `railway up` again.
-
-## Before you tell customers
-- Replace placeholder text (prices, descriptions) with your real ones.
-- The home page shows "4.9★ customer love" and "100% handmade" as fixed text: change or remove what isn't true yet.
-- Change the admin email/password if you shared them anywhere.
+## Taking online payments (Razorpay)
+Until the `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` variables are set, **"Pay online" is switched off on the live site**
+(customers see a message and can use Cash on Delivery). Add your Razorpay keys and `RAZORPAY_WEBHOOK_SECRET`, and add the
+webhook `https://<your-link>/api/webhooks/razorpay` in the Razorpay Dashboard. Full details: DOCKER.md.

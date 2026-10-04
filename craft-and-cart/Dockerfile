@@ -28,6 +28,8 @@ RUN npm run build
 # bcryptjs is bundled in (the compact server image does not contain it); pg is already present in the image.
 RUN npx esbuild scripts/seed.ts --bundle --platform=node --target=node22 --format=cjs \
       --external:pg --outfile=dist/db-setup.cjs
+RUN npx esbuild scripts/create-admin.ts --bundle --platform=node --target=node22 --format=cjs \
+      --external:pg --outfile=dist/create-admin.cjs
 
 # ---------- 3. run it ----------
 FROM node:${NODE_VERSION}-alpine AS runner
@@ -44,6 +46,7 @@ COPY --from=builder --chown=node:node /app/public ./public
 # database setup tool + schema (run on demand:  node scripts/db-setup.cjs)
 COPY --from=builder --chown=node:node /app/db ./db
 COPY --from=builder --chown=node:node /app/dist/db-setup.cjs ./scripts/db-setup.cjs
+COPY --from=builder --chown=node:node /app/dist/create-admin.cjs ./scripts/create-admin.cjs
 # Next.js writes optimised images here at runtime
 RUN mkdir -p .next/cache && chown -R node:node .next
 

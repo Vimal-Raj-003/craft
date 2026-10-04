@@ -2,7 +2,7 @@
 
 A full-stack online store for handmade crochet: bouquets that never wilt, keychains, hair accessories and amigurumi,
 wrapped in a South Indian (Pongal) design with smooth animations. Customers can browse, add to cart, and check out with
-**PhonePe** (UPI, cards, netbanking) or **Cash on Delivery**; the owner manages orders from an **admin dashboard**.
+**Razorpay** (UPI, cards, netbanking, wallets) or **Cash on Delivery**; customers have their own account area, and the owner manages orders, customers and payments from a **Super Admin panel**.
 
 <table>
   <tr>
@@ -46,12 +46,13 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 
 **Cart and checkout**
 - Cart that remembers items between visits, with a free-shipping progress bar (free over ₹999, otherwise ₹79).
-- Checkout with address validation and a choice of **PhonePe** or **Cash on Delivery**.
+- Checkout with address validation and a choice of **Razorpay** or **Cash on Delivery**. Customers must sign in to order, so every order and payment belongs to an account.
 - Order status page that updates itself while a payment is being confirmed; stock is reduced only when an order is confirmed.
 
 **Accounts and admin**
-- Customer sign-up and sign-in (passwords hashed with bcrypt, session in an httpOnly cookie), and an "My orders" page.
-- Admin dashboard: revenue, order list with a status dropdown, low-stock warnings, and custom-order requests.
+- Customer sign-up (name, email, phone, password), sign-in, sign-out and forgot/reset password (passwords hashed with bcrypt, session in an httpOnly cookie).
+- `/account`: My orders (with order and payment status), order details, profile, saved addresses and password change. A customer can only ever see their own data.
+- Super Admin panel (`/admin/login`): dashboard, searchable orders with status updates, customers and their order history, and a payments ledger with Razorpay IDs. Role-checked on the server for every page and API call.
 - Newsletter sign-up and custom-order requests are saved in the database.
 
 **Design and experience**
@@ -70,7 +71,7 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 | Database | PostgreSQL through the `pg` driver (plain SQL, no ORM) |
 | Auth | `jose` (signed JWT in an httpOnly cookie) and `bcryptjs` |
 | Validation | `zod` on every API route |
-| Payments | PhonePe Payment Gateway (Standard Checkout v2) and Cash on Delivery |
+| Payments | Razorpay Standard Checkout (server-side order creation, HMAC signature verification, signed webhooks) and Cash on Delivery |
 | Hosting | Docker on your own VPS behind Nginx (see [Deploy it online](#deploy-it-online)); also runs on any Node.js host |
 
 ## Repository layout
@@ -82,7 +83,7 @@ craft/
 ├── craft-and-cart/           ← THE WEBSITE
 │   ├── src/app/              pages and API routes (shop, product, checkout, order, admin, ...)
 │   ├── src/components/       UI: navbar, hero, scenes, product cards, cart drawer, ...
-│   ├── src/lib/              database, auth, cart, money, orders and PhonePe helpers
+│   ├── src/lib/              database, auth, cart, money, orders and Razorpay helpers
 │   ├── db/schema.sql         database tables
 │   ├── scripts/              local database server and the seed script
 │   ├── public/               product photos and images
@@ -119,8 +120,8 @@ npm run dev
 
 Open **http://localhost:3000**.
 
-The seed script creates 17 sample products across four collections and one admin account. For local use the admin login
-is `admin@craftandcart.local` with the demo password `admin12345`, or whatever you put in `ADMIN_PASSWORD`.
+The seed script creates 17 sample products across four collections and one Super Admin account. For local use the admin login
+(at `/admin/login`) is `admin@craftandcart.local` with the demo password `admin12345`, or whatever you put in `ADMIN_PASSWORD`.
 **Never use the demo password on a public site** (the seed script refuses to create a weak admin for an online database).
 
 Prefer your own PostgreSQL? Create a database, run `db/schema.sql` in it, set `DATABASE_URL` in `.env.local`, run
@@ -135,11 +136,12 @@ Copy [`craft-and-cart/.env.example`](craft-and-cart/.env.example) to `.env.local
 | `DATABASE_URL` | always | PostgreSQL connection string. Local default is the built-in database. |
 | `DATABASE_SSL` | if your host requires it | `true` to connect over SSL. |
 | `JWT_SECRET` | **required in production** | Signs login cookies. Use a long random string. |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | when seeding | The admin account. The password is **required** (10+ characters) for an online database. |
-| `NEXT_PUBLIC_SITE_URL` | for PhonePe | Your public address; PhonePe returns customers here. |
-| `PHONEPE_ENV` | for PhonePe | `sandbox` for testing, `production` when live. |
-| `PHONEPE_CLIENT_ID`, `PHONEPE_CLIENT_SECRET`, `PHONEPE_CLIENT_VERSION` | for PhonePe | Credentials from the PhonePe merchant dashboard. |
-| `PHONEPE_WEBHOOK_USER` / `PHONEPE_WEBHOOK_PASS` | for PhonePe | Credentials PhonePe uses to prove a webhook is genuine; you choose them. |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | when seeding / creating the admin | The first Super Admin. The password is **required** (10+ characters) for an online database. |
+| `NEXT_PUBLIC_SITE_URL` | in production | Your public address (used in password-reset emails). |
+| `RAZORPAY_KEY_ID` | for online payments | Public key id (`rzp_test_…` while testing, `rzp_live_…` when live). |
+| `RAZORPAY_KEY_SECRET` | for online payments | **Server only.** Never sent to the browser, never committed. |
+| `RAZORPAY_WEBHOOK_SECRET` | for the webhook | A secret you choose; use the same value when adding the webhook in the Razorpay Dashboard. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | optional | Mailbox used to send "Forgot password" emails. Without it, locally the reset link is printed in the server console. |
 
 ## npm scripts
 
@@ -152,30 +154,33 @@ Run these inside `craft-and-cart/`.
 | `npm run lint` | Check the code style. |
 | `npm run db:start` | Start the built-in local PostgreSQL (port 54329, data in `.pgdata/`). |
 | `npm run db:seed` | Create tables and sample data for local development (reads `.env.local`). |
-| `npm run db:setup` | Same, for a hosted database (reads settings from the environment). Safe to repeat. |
+| `npm run db:setup` | Same, for a hosted database (reads settings from the environment). Safe to repeat; upgrades older databases in place. |
+| `npm run admin:create` | Create the first Super Admin, promote an existing account, or reset a Super Admin password (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). |
 
 ## How payments work
 
-At checkout the customer chooses:
+Customers sign in, then choose:
 
-- **Cash on Delivery:** the order is confirmed immediately with status `confirmed`.
-- **PhonePe:** the server creates a PhonePe order and sends the customer to PhonePe (the PhonePe app opens on phones).
-  When they come back, and again when PhonePe calls the webhook, the **server asks PhonePe for the real status** before
-  marking the order `paid`. The browser is never trusted for the result.
+- **Cash on Delivery:** the order is confirmed immediately (`confirmed`); the payment stays `pending` until the Super Admin marks the order `delivered`, which records the cash as `paid`.
+- **Razorpay:** the server calculates the amount from the database and creates a Razorpay order; the browser opens Razorpay Checkout;
+  after payment the browser sends back Razorpay's `order_id`, `payment_id` and `signature`, and the **server verifies the signature
+  with the Key Secret** (HMAC-SHA256) before confirming the order and taking stock. If the browser never reports back (tab closed),
+  the signed webhook or the order page asking Razorpay directly settles it. A payment the browser merely *claims* is never believed.
 
-**Setting up PhonePe:** create a merchant account at <https://business.phonepe.com>, copy the Client ID, Client Secret and
-Client Version into `.env.local`, and set the webhook to `https://<your-site>/api/webhooks/phonepe` with the events
-`checkout.order.completed` and `checkout.order.failed`.
+Safeguards: the same cart sent twice returns the same order (no duplicates); verifying twice, or a repeated webhook, changes
+nothing the second time; a webhook with the wrong amount is ignored; failure and cancel notes can never undo a paid payment.
 
-**Without PhonePe keys**
-- On your own computer, "Pay online" runs in a **demo mode** that simulates a successful payment (no money moves).
-- On a live site (`NODE_ENV=production`), "Pay online" is **switched off** with a clear message and only Cash on Delivery
-  works. Fake payments can never be created online.
+**Razorpay test mode:** in the Razorpay Dashboard switch to *Test Mode*, generate test keys, put them in `.env.local`
+(`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`), and pay with Razorpay's test UPI id `success@razorpay` or test card
+`4111 1111 1111 1111`. Webhook (needs a public address): `https://<your-site>/api/webhooks/razorpay`, events
+`payment.captured`, `payment.failed`, `order.paid`, secret = `RAZORPAY_WEBHOOK_SECRET`. Full steps: [`craft-and-cart/DOCKER.md`](craft-and-cart/DOCKER.md).
 
+**Without Razorpay keys** "Pay online" is switched off with a clear message and only Cash on Delivery works. There is no
+simulated payment anywhere, locally or live.
 ## Database
 
-Tables are defined in [`db/schema.sql`](craft-and-cart/db/schema.sql): `users`, `categories`, `products`, `orders`,
-`order_items`, `reviews`, `custom_requests` and `newsletter`. Prices are stored in paise (integers), orders keep a copy of
+Tables are defined in [`db/schema.sql`](craft-and-cart/db/schema.sql): `users` (role `CUSTOMER` or `SUPER_ADMIN`), `addresses`, `categories`, `products`, `orders`,
+`order_items`, `payments`, `password_resets`, `reviews`, `custom_requests` and `newsletter`. Prices are stored in paise (integers), orders keep a copy of
 each item's name and price, and the schema is safe to run repeatedly.
 
 The seed script ([`scripts/seed.ts`](craft-and-cart/scripts/seed.ts)) defines the catalogue. To change products, edit it and
@@ -188,17 +193,20 @@ run the seed command again. On an online database it never resets your stock num
 | `/` | Home |
 | `/shop`, `/product/[slug]` | Browse and view products |
 | `/checkout`, `/order/[id]` | Checkout and order status |
-| `/login`, `/account` | Sign in, order history |
-| `/admin` | Admin dashboard (admin accounts only) |
+| `/login`, `/forgot-password`, `/reset-password` | Sign up / sign in, password reset |
+| `/account`, `/account/orders/[id]`, `/account/profile`, `/account/addresses` | Customer area (own data only) |
+| `/admin/login` | Super Admin sign-in |
+| `/admin/dashboard`, `/admin/orders`, `/admin/customers`, `/admin/payments` | Super Admin panel (SUPER_ADMIN role only) |
 
 | API route | Purpose |
 |---|---|
 | `GET /api/products` | Product list (filters: `category`, `q`, `sort`, `featured`) |
-| `POST /api/auth/[register\|login\|logout]`, `GET /api/auth/me` | Accounts and sessions |
-| `POST /api/checkout`, `POST /api/checkout/verify` | Create an order; demo-payment confirmation (local only) |
-| `POST /api/webhooks/phonepe` | PhonePe payment notifications (signature-checked) |
+| `POST /api/auth/[register\|login\|admin-login\|logout\|forgot\|reset]`, `GET /api/auth/me` | Accounts and sessions |
+| `GET/PATCH/POST /api/account/profile`, `GET/POST /api/account/addresses`, `PATCH/DELETE /api/account/addresses/[id]` | Customer profile and addresses (signed-in user only) |
+| `POST /api/checkout`, `POST /api/checkout/verify` | Create the order and Razorpay order; verify the Razorpay signature |
+| `POST /api/webhooks/razorpay` | Razorpay notifications (HMAC-signature-checked) |
 | `POST /api/contact/[newsletter\|custom]` | Newsletter and custom-order requests |
-| `GET/PATCH /api/admin/orders` | Admin order list and status changes (admin only) |
+| `GET/PATCH /api/admin/orders` | Order search and status changes (SUPER_ADMIN only) |
 
 ## Deploy it online
 
@@ -228,7 +236,7 @@ Nothing in the code is tied to a particular host. On any server with Node.js 20+
 ```bash
 cd craft-and-cart
 npm ci --include=dev
-# set DATABASE_URL, JWT_SECRET, NEXT_PUBLIC_SITE_URL (and PHONEPE_*) in the environment or in .env.production
+# set DATABASE_URL, JWT_SECRET, NEXT_PUBLIC_SITE_URL (and RAZORPAY_*) in the environment or in .env.production
 ADMIN_PASSWORD='<10+ characters>' npm run db:setup     # once
 npm run build
 npm start                                                # listens on port 3000 (set PORT to change)
@@ -244,7 +252,7 @@ available as alternatives.
 - Every API input is validated with `zod`; every database query is parameterised.
 - Passwords are hashed with bcrypt; sessions are signed, httpOnly cookies. The site refuses to start sessions in production without `JWT_SECRET`.
 - Order totals, prices and stock are always calculated on the server.
-- Payment results come only from PhonePe's status API, and webhooks must carry the correct signature.
+- Payment results are only accepted after the server verifies Razorpay's HMAC signature (or a signed webhook / Razorpay's own API). The Key Secret never leaves the server.
 - Admin pages and the admin API check the user's role on every request.
 
 ## Known limitations
@@ -263,7 +271,7 @@ available as alternatives.
 | `connect ECONNREFUSED` / the site shows no products | The database is not running: start it with `npm run db:start`, then `npm run db:seed`. |
 | Port 3000 or 54329 is already in use | Stop the other program, or run `npm run dev -- -p 3100` (and set `PGPORT` for the database). |
 | "JWT_SECRET must be set in production" | Add a `JWT_SECRET` environment variable on your host. |
-| "Online payment isn't available yet" on the live site | Add the `PHONEPE_*` variables; until then only Cash on Delivery works. |
+| "Online payment isn't available yet" on the live site | Add the `RAZORPAY_*` variables; until then only Cash on Delivery works. |
 | Seeding an online database refuses to run | Set `ADMIN_PASSWORD` (10+ characters) in the environment first. |
 | `npm run db:start` fails on first run | Delete the `.pgdata/` folder and run it again to recreate the local database. |
 

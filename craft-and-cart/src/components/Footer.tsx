@@ -45,7 +45,7 @@ export default function Footer() {
           <p className="mt-2 h-5 text-sm text-mint">{msg}</p>
         </form>
       </div>
-      <p className="mt-12 text-center text-xs text-dim">© {new Date().getFullYear()} Craft & Cart · Pay online with PhonePe or Cash on Delivery</p>
+      <p className="mt-12 text-center text-xs text-dim">© {new Date().getFullYear()} Craft & Cart · Pay online with Razorpay or Cash on Delivery</p>
     </footer>
   );
 }

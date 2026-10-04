@@ -72,7 +72,7 @@ async function main() {
   await pool.query("DELETE FROM categories WHERE slug <> ALL($1)", [categories.map((c) => c[0])]);
 
   await pool.query(
-    `INSERT INTO users(email,name,password_hash,role) VALUES($1,'Admin',$2,'admin')
+    `INSERT INTO users(email,name,password_hash,role) VALUES($1,'Admin',$2,'SUPER_ADMIN')
      ON CONFLICT (email) DO NOTHING`,
     [adminEmail, await bcrypt.hash(adminPass, 10)],
   );

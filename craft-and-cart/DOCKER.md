@@ -41,7 +41,7 @@ cp .env.production.example .env.production
 chmod 600 .env.production
 echo "CRAFT_DB_PASSWORD=$(openssl rand -hex 24)" >> .env.production    # then remove the empty CRAFT_DB_PASSWORD= line
 echo "JWT_SECRET=$(openssl rand -hex 32)"        >> .env.production    # then remove the empty JWT_SECRET= line
-nano .env.production                                                    # check; add PHONEPE_* later if you use PhonePe
+nano .env.production                                                    # check; add RAZORPAY_* / SMTP_* (see below)
 ```
 
 The stack refuses to start if either secret is missing. `JWT_SECRET` must be 32+ characters (the site also checks this at start-up).
@@ -54,7 +54,7 @@ craft up -d
 craft ps               # both should become "healthy" (about 1 minute)
 ```
 
-## 4. Create the tables, products and the admin account (once)
+## 4. Create the tables, products and the first Super Admin (once)
 
 Choose a strong admin password (10+ characters). It is typed once, here, and is not stored in the running container:
 
@@ -63,7 +63,14 @@ ADMIN_PASSWORD='choose-a-strong-password' ADMIN_EMAIL='you@example.com' \
   craft run --rm -e ADMIN_PASSWORD -e ADMIN_EMAIL craft-web node scripts/db-setup.cjs
 ```
 
-Safe to run again later: it updates products but never resets stock, never adds sample reviews, and never changes an existing admin password.
+Safe to run again later: it upgrades the tables in place, updates products but never resets stock, never adds sample reviews, and never changes an existing admin password.
+
+The account it creates has the role `SUPER_ADMIN` and signs in at **https://craft.jilljill.in/admin/login**. To add another Super Admin, promote an existing customer, or reset a Super Admin's password later:
+
+```bash
+ADMIN_EMAIL='someone@example.com' ADMIN_PASSWORD='a-strong-password' \
+  craft run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD craft-web node scripts/create-admin.cjs
+```
 
 ## 5. Add the Nginx site (a new file; existing sites are untouched)
 
@@ -86,7 +93,7 @@ BASE_URL=https://craft.jilljill.in ADMIN_EMAIL='you@example.com' ADMIN_PASSWORD=
 
 The smoke test checks health, pages, images, HTTPS redirect, security rules, and the admin session
 (`/api/auth/me` after login, with the Secure/HttpOnly cookie, through Nginx over HTTPS). Finish by opening
-https://craft.jilljill.in in a browser, placing a Cash-on-Delivery test order, and signing in at `/login`.
+https://craft.jilljill.in in a browser, creating a customer account, placing a test order, and signing in at `/admin/login`.
 
 ## Everyday operations
 
@@ -103,18 +110,29 @@ https://craft.jilljill.in in a browser, placing a Cash-on-Delivery test order, a
 
 **Never** run `craft down -v` unless you want to delete the database volume.
 
-## Turning on PhonePe later
+## Turning on Razorpay (online payments)
 
-Add the `PHONEPE_*` values to `.env.production`, run `craft up -d`, and set the PhonePe webhook to
-`https://craft.jilljill.in/api/webhooks/phonepe`. Until then "Pay online" shows a message and Cash on Delivery works.
+Until the keys are set, "Pay online" shows a friendly message and Cash on Delivery keeps working.
 
+1. In the Razorpay Dashboard switch to **Test Mode**, open **Account & Settings → API Keys → Generate Test Key**, and copy the Key Id (`rzp_test_…`) and Key Secret.
+2. Add to `.env.production`: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and a long random `RAZORPAY_WEBHOOK_SECRET` (`openssl rand -hex 24`). Then `craft up -d`.
+3. **Account & Settings → Webhooks → Add New Webhook**: URL `https://craft.jilljill.in/api/webhooks/razorpay`, Secret = your `RAZORPAY_WEBHOOK_SECRET`, events **payment.captured**, **payment.failed**, **order.paid**.
+4. Test with Razorpay's test cards/UPI (for example UPI id `success@razorpay`; test card 4111 1111 1111 1111, any future expiry, any CVV, OTP 1234 when asked). In the Dashboard open **Transactions** to see the payment, and in `/admin/payments` to see it recorded.
+5. When ready for real money, complete Razorpay KYC, switch to **Live Mode**, generate live keys, replace the three values, create the webhook again in Live Mode, and `craft up -d`.
+
+The Key Secret only ever exists inside the `craft-web` container; it is never sent to browsers.
+
+## Forgot-password emails (optional)
+
+Add an SMTP mailbox to `.env.production` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`; for a Hostinger mailbox: `smtp.hostinger.com`, `465`). Without it, "Forgot password" shows its normal message but no email can be sent.
 ## Security design
 
 - `craft-db` has no `ports:` entry: PostgreSQL is reachable only from `craft-web` over `craft_net`.
 - `craft-web` publishes only `127.0.0.1:3215`, so the internet reaches it solely through Nginx over HTTPS.
 - The app runs as a non-root user with all Linux capabilities dropped and `no-new-privileges`; memory is capped (web 768 MB, db 512 MB) so it cannot starve your other apps; logs rotate at 10 MB × 3.
 - Login cookies are `HttpOnly; Secure; SameSite=Lax` and are only ever used by browsers on HTTPS.
-- Fake "demo" payments are impossible in production; online payment is off until PhonePe keys are set.
+- There are no fake or demo payments anywhere: an order is only marked paid after the server verifies Razorpay's signature (or a signed webhook / Razorpay's own status API).
+- Customers can only read their own orders; the Super Admin area checks the role on the server for every page and API call.
 
 ## Troubleshooting
 

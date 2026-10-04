@@ -43,22 +43,25 @@ fi
 
 # 3) security rules
 [ "$(code "$BASE_URL/api/admin/orders")" = "403" ] && pass "admin API is closed without a login" || bad "admin API open without login"
-[ "$(code -X POST -d '{}' "$BASE_URL/api/webhooks/phonepe")" = "401" ] && pass "payment webhook rejects unsigned calls" || bad "webhook accepts unsigned calls"
-[ "$(code -X POST -d '{"orderId":"00000000-0000-0000-0000-000000000000"}' "$BASE_URL/api/checkout/verify")" = "403" ] && pass "demo-payment endpoint is disabled" || bad "demo-payment endpoint is open"
+[ "$(code -X POST -d '{}' "$BASE_URL/api/webhooks/razorpay")" = "401" ] && pass "Razorpay webhook rejects unsigned calls" || bad "webhook accepts unsigned calls"
+[ "$(code -X POST -d '{"orderId":"00000000-0000-0000-0000-000000000000"}' "$BASE_URL/api/checkout/verify")" = "401" ] && pass "payment verify needs a signed-in customer" || bad "payment verify is open"
+[ "$(code -X POST -d '{}' "$BASE_URL/api/checkout")" = "401" ] && pass "checkout needs a signed-in customer" || bad "checkout is open to guests"
+[ "$(code "$BASE_URL/account")" = "307" ] && pass "/account sends signed-out visitors to login" || bad "/account not protected"
+[ "$(code "$BASE_URL/admin/dashboard")" = "307" ] && pass "/admin/dashboard sends signed-out visitors away" || bad "/admin/dashboard not protected"
 [ "$(code -H 'Cookie: cc_session=forged.value.here' "$BASE_URL/api/admin/orders")" = "403" ] && pass "forged login cookie is rejected" || bad "forged cookie accepted"
 
-# 4) admin sign-in session (the cookie is HttpOnly + Secure + SameSite=Lax, so use a cookie jar over HTTPS)
+# 4) Super Admin sign-in session (the cookie is HttpOnly + Secure + SameSite=Lax, so use a cookie jar over HTTPS)
 if [ -n "$ADMIN_PASSWORD" ]; then
-  hdrs="$(curl -s -i -c "$JAR" -X POST -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" "$BASE_URL/api/auth/login")"
+  hdrs="$(curl -s -i -c "$JAR" -X POST -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" "$BASE_URL/api/auth/admin-login")"
   echo "$hdrs" | grep -qi '^HTTP/.* 200' && pass "admin sign-in succeeds" || bad "admin sign-in"
   echo "$hdrs" | grep -i '^set-cookie: cc_session' | grep -qi 'HttpOnly' && pass "cookie is HttpOnly" || bad "cookie not HttpOnly"
   echo "$hdrs" | grep -i '^set-cookie: cc_session' | grep -qi 'Secure' && pass "cookie is Secure" || bad "cookie not Secure"
   echo "$hdrs" | grep -i '^set-cookie: cc_session' | grep -qi 'SameSite=lax' && pass "cookie is SameSite=Lax" || bad "cookie SameSite"
   case "$BASE_URL" in
     https://*)
-      curl -s -b "$JAR" "$BASE_URL/api/auth/me" | grep -q '"role":"admin"' && pass "/api/auth/me recognises the signed-in admin" || bad "/api/auth/me after login"
+      curl -s -b "$JAR" "$BASE_URL/api/auth/me" | grep -q '"role":"SUPER_ADMIN"' && pass "/api/auth/me recognises the signed-in admin" || bad "/api/auth/me after login"
       [ "$(code -b "$JAR" "$BASE_URL/api/admin/orders")" = "200" ] && pass "admin orders API works after login" || bad "admin orders API after login"
-      curl -s -b "$JAR" "$BASE_URL/admin" | grep -q 'Recent orders' && pass "admin dashboard renders" || bad "admin dashboard"
+      curl -s -b "$JAR" "$BASE_URL/admin/dashboard" | grep -q 'Recent orders' && pass "admin dashboard renders" || bad "admin dashboard"
       curl -s -b "$JAR" -X POST "$BASE_URL/api/auth/logout" >/dev/null && pass "sign-out works"
       ;;
     *) echo "SKIP  session checks need HTTPS because the cookie is Secure" ;;

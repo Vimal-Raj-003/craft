@@ -1,43 +1,45 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { formatINR } from "@/lib/money";
-import LogoutButton from "@/components/LogoutButton";
+import StatusBadge from "@/components/StatusBadge";
 
 export const dynamic = "force-dynamic";
 
 export default async function Account() {
-  const user = await getSession();
-  if (!user) redirect("/login");
+  const user = (await getSession())!; // the layout already redirected signed-out visitors
   const { rows: orders } = await pool.query(
-    `SELECT o.id,o.status,o.total_paise,o.created_at,
+    `SELECT o.id,o.status,o.total_paise,o.created_at,pay.status AS payment_status,
             (SELECT string_agg(i.name || ' × ' || i.qty, ', ') FROM order_items i WHERE i.order_id=o.id) AS items
-     FROM orders o WHERE o.user_id=$1 ORDER BY o.created_at DESC`,
+       FROM orders o LEFT JOIN payments pay ON pay.order_id=o.id
+      WHERE o.user_id=$1 ORDER BY o.created_at DESC`,
     [user.id],
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-10 pt-32 sm:px-6 sm:pt-36">
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold">Hi, <span className="text-gradient">{user.name.split(" ")[0]}</span> 👋</h1>
-        <LogoutButton />
-      </div>
-      <h2 className="mt-12 text-xl font-semibold">Your orders</h2>
+    <>
+      <h2 className="text-xl font-semibold">Your orders</h2>
       <div className="mt-4 space-y-3">
-        {orders.length === 0 && <p className="text-dim">No orders yet — go find something soft.</p>}
+        {orders.length === 0 && (
+          <div className="glass rounded-2xl p-6 text-dim">No orders yet — <Link href="/shop" className="font-semibold text-ink underline">go find something soft</Link>.</div>
+        )}
         {orders.map((o) => (
-          <div key={o.id} className="glass flex items-center justify-between gap-4 rounded-2xl p-5">
-            <div className="min-w-0">
-              <p className="truncate font-medium">{o.items}</p>
-              <p className="text-xs text-dim">#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString("en-IN")}</p>
-            </div>
-            <div className="text-right">
+          <Link key={o.id} href={`/account/orders/${o.id}`} className="glass block rounded-2xl p-5 transition hover:-translate-y-0.5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{o.items}</p>
+                <p className="text-xs text-dim">#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleDateString("en-IN")}</p>
+              </div>
               <p className="font-semibold">{formatINR(o.total_paise)}</p>
-              <p className="text-xs capitalize text-mint">{o.status}</p>
             </div>
-          </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-dim">
+              <span className="flex items-center gap-2">Order <StatusBadge value={o.status} /></span>
+              <span className="flex items-center gap-2">Payment <StatusBadge value={o.payment_status} /></span>
+              <span className="ml-auto font-semibold text-ink">View details →</span>
+            </div>
+          </Link>
         ))}
       </div>
-    </div>
+    </>
   );
 }

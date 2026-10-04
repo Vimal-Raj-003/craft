@@ -1,61 +1,105 @@
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { shippingFor } from "@/lib/money";
-import { finalizeOrder } from "@/lib/orders";
-import { createPayment, phonepeConfigured, siteUrl } from "@/lib/phonepe";
+import { fail, PHONE_RE, sameOrigin } from "@/lib/http";
+import { confirmCodOrder } from "@/lib/orders";
+import { createRazorpayOrder, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
 
 const Body = z.object({
   paymentMethod: z.enum(["online", "cod"]),
   name: z.string().trim().min(2).max(100),
-  email: z.string().trim().email(),
-  phone: z.string().trim().regex(/^[0-9+\-\s]{10,15}$/, "Invalid phone"),
+  phone: z.string().trim().regex(PHONE_RE, "Invalid phone"),
   address: z.object({
     line1: z.string().trim().min(3).max(200),
     city: z.string().trim().min(2).max(80),
     state: z.string().trim().min(2).max(80),
     pincode: z.string().trim().regex(/^[0-9]{6}$/, "Pincode must be 6 digits"),
   }),
+  saveAddress: z.boolean().optional(),
   items: z
     .array(z.object({ productId: z.number().int().positive(), qty: z.number().int().min(1).max(20), color: z.string().max(50).optional() }))
     .min(1)
     .max(50),
 });
 
+type Customer = { name: string; email: string; phone: string };
+
+/** What the browser needs to open Razorpay Checkout. Contains the PUBLIC key id only. */
+const razorpayParams = (orderId: string, razorpayOrderId: string, amount: number, c: Customer) => ({
+  orderId,
+  method: "online" as const,
+  razorpay: {
+    key: razorpayKeyId(),
+    order_id: razorpayOrderId,
+    amount,
+    currency: "INR",
+    name: "Craft & Cart",
+    description: "Handmade crochet order",
+    prefill: { name: c.name, email: c.email, contact: c.phone },
+  },
+});
+
 export async function POST(req: Request) {
+  if (!sameOrigin(req)) return fail("Forbidden", 403);
+  const session = await getSession();
+  if (!session) return fail("Please sign in to place an order", 401);
+
   const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
-  }
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request");
   const b = parsed.data;
+  const customer: Customer = { name: b.name, email: session.email, phone: b.phone };
+
+  if (b.paymentMethod === "online" && !razorpayConfigured()) {
+    return fail("Online payment isn't available right now. Please choose Cash on Delivery.", 503);
+  }
 
   // Prices & stock always come from the DB, never from the client.
   const ids = [...new Set(b.items.map((i) => i.productId))];
-  const { rows: products } = await pool.query(
-    "SELECT id,name,price_paise,stock FROM products WHERE id = ANY($1) AND active",
-    [ids],
-  );
+  const { rows: products } = await pool.query("SELECT id,name,price_paise,stock FROM products WHERE id = ANY($1) AND active", [ids]);
   const byId = new Map(products.map((p) => [p.id as number, p]));
+  const wanted = new Map<number, number>();
+  for (const it of b.items) wanted.set(it.productId, (wanted.get(it.productId) ?? 0) + it.qty);
   let subtotal = 0;
   for (const it of b.items) {
     const p = byId.get(it.productId);
-    if (!p) return NextResponse.json({ error: "A product in your cart is no longer available" }, { status: 400 });
-    if (p.stock < it.qty) return NextResponse.json({ error: `Only ${p.stock} left of ${p.name}` }, { status: 409 });
+    if (!p) return fail("A product in your cart is no longer available");
+    if (p.stock < (wanted.get(it.productId) ?? it.qty)) return fail(`Only ${p.stock} left of ${p.name}`, 409);
     subtotal += p.price_paise * it.qty;
   }
   const shipping = shippingFor(subtotal);
   const total = subtotal + shipping;
-  const session = await getSession();
+
+  // Duplicate protection: the same signed-in customer sending the same cart, address and payment method again
+  // (double click, refresh, retry after closing the Razorpay window) gets the SAME order back, not a second one.
+  const fingerprint = crypto
+    .createHash("sha256")
+    .update(JSON.stringify([b.paymentMethod, total, b.address, [...b.items].sort((x, y) => x.productId - y.productId || (x.color ?? "").localeCompare(y.color ?? ""))]))
+    .digest("hex");
+  const window = b.paymentMethod === "cod" ? 60 : 1800;
+  const { rows: dup } = await pool.query(
+    `SELECT o.id, p.status AS pay_status, p.razorpay_order_id
+       FROM orders o JOIN payments p ON p.order_id=o.id
+      WHERE o.user_id=$1 AND o.idempotency_key=$2 AND o.status <> 'cancelled' AND o.created_at > now() - ($3 * interval '1 second')
+      ORDER BY o.created_at DESC LIMIT 1`,
+    [session.id, fingerprint, window],
+  );
+  if (dup[0]) {
+    if (b.paymentMethod === "cod") return NextResponse.json({ orderId: dup[0].id, method: "cod" });
+    if (dup[0].pay_status === "paid") return NextResponse.json({ orderId: dup[0].id, method: "online", alreadyPaid: true });
+    if (dup[0].razorpay_order_id) return NextResponse.json(razorpayParams(dup[0].id, dup[0].razorpay_order_id, total, customer));
+  }
 
   const client = await pool.connect();
   let orderId: string;
   try {
     await client.query("BEGIN");
     const o = await client.query(
-      `INSERT INTO orders(user_id,email,name,phone,address,subtotal_paise,shipping_paise,total_paise,payment_method)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-      [session?.id ?? null, b.email, b.name, b.phone, b.address, subtotal, shipping, total, b.paymentMethod],
+      `INSERT INTO orders(user_id,email,name,phone,address,subtotal_paise,shipping_paise,total_paise,payment_method,idempotency_key)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      [session.id, session.email, b.name, b.phone, b.address, subtotal, shipping, total, b.paymentMethod, fingerprint],
     );
     orderId = o.rows[0].id;
     for (const it of b.items) {
@@ -65,38 +109,39 @@ export async function POST(req: Request) {
         [orderId, p.id, p.name, it.color ?? null, it.qty, p.price_paise],
       );
     }
+    await client.query(
+      "INSERT INTO payments(order_id,user_id,provider,status,amount_paise) VALUES($1,$2,$3,'pending',$4)",
+      [orderId, session.id, b.paymentMethod === "cod" ? "cod" : "razorpay", total],
+    );
+    if (b.saveAddress) {
+      const exists = await client.query("SELECT count(*)::int AS n FROM addresses WHERE user_id=$1", [session.id]);
+      await client.query(
+        "INSERT INTO addresses(user_id,name,phone,line1,city,state,pincode,is_default) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+        [session.id, b.name, b.phone, b.address.line1, b.address.city, b.address.state, b.address.pincode, exists.rows[0].n === 0],
+      );
+    }
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK");
     console.error(e);
-    return NextResponse.json({ error: "Could not create order" }, { status: 500 });
+    return fail("Could not create order", 500);
   } finally {
     client.release();
   }
 
-  // Cash on delivery: no online payment, the order is confirmed right away.
   if (b.paymentMethod === "cod") {
-    await finalizeOrder(orderId, "confirmed", "cod");
+    await confirmCodOrder(orderId);
     return NextResponse.json({ orderId, method: "cod" });
   }
 
-  // No PhonePe credentials yet → demo mode (the checkout page simulates the payment).
-  if (!phonepeConfigured()) {
-    // Never simulate a payment on a live site: it would let anyone create "paid" orders for free.
-    if (process.env.NODE_ENV === "production") {
-      await pool.query("UPDATE orders SET status='cancelled' WHERE id=$1", [orderId]);
-      return NextResponse.json({ error: "Online payment isn't available yet. Please choose Cash on Delivery." }, { status: 503 });
-    }
-    return NextResponse.json({ orderId, method: "online", demo: true });
-  }
-
   try {
-    const pay = await createPayment(orderId, total, `${siteUrl()}/order/${orderId}`);
-    await pool.query("UPDATE orders SET payment_ref=$2 WHERE id=$1", [orderId, pay.phonepeOrderId]);
-    return NextResponse.json({ orderId, method: "online", redirectUrl: pay.redirectUrl });
+    const rz = await createRazorpayOrder(total, orderId);
+    await pool.query("UPDATE payments SET razorpay_order_id=$2, updated_at=now() WHERE order_id=$1", [orderId, rz.id]);
+    return NextResponse.json(razorpayParams(orderId, rz.id, total, customer));
   } catch (e) {
-    console.error("PhonePe order failed", e);
-    await pool.query("UPDATE orders SET status='failed' WHERE id=$1", [orderId]);
-    return NextResponse.json({ error: "Payment gateway unavailable. Please try again or choose Cash on Delivery." }, { status: 502 });
+    console.error("Razorpay order failed", e);
+    await pool.query("UPDATE orders SET status='cancelled' WHERE id=$1", [orderId]);
+    await pool.query("UPDATE payments SET status='failed', failure_reason='Could not reach Razorpay', updated_at=now() WHERE order_id=$1", [orderId]);
+    return fail("Payment gateway unavailable. Please try again or choose Cash on Delivery.", 502);
   }
 }

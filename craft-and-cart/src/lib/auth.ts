@@ -11,7 +11,8 @@ const secret = () => {
   return new TextEncoder().encode(s ?? "dev-secret-change-me");
 };
 
-export type SessionUser = { id: string; email: string; name: string; role: "customer" | "admin" };
+export type Role = "CUSTOMER" | "SUPER_ADMIN";
+export type SessionUser = { id: string; email: string; name: string; role: Role };
 
 export async function createSession(user: SessionUser) {
   const token = await new SignJWT({ ...user })
@@ -43,4 +44,10 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
+}
+
+/** The signed-in Super Admin, or null. Always checked on the server, from the database. */
+export async function getAdmin() {
+  const s = await getSession();
+  return s?.role === "SUPER_ADMIN" ? s : null;
 }

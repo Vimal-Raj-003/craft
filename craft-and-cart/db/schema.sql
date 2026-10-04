@@ -86,11 +86,87 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Migrations for databases created before PhonePe / COD support (safe to re-run).
+-- ---------------------------------------------------------------------------
+-- Migrations (safe to re-run). Older databases are upgraded in place; nothing is dropped except
+-- obsolete constraints and the unused razorpay_* columns from the very first version.
+-- ---------------------------------------------------------------------------
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'online';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_ref TEXT;
 ALTER TABLE orders DROP COLUMN IF EXISTS razorpay_order_id;
 ALTER TABLE orders DROP COLUMN IF EXISTS razorpay_payment_id;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+CREATE INDEX IF NOT EXISTS orders_idem_idx ON orders(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+-- Users: phone number and the roles CUSTOMER / SUPER_ADMIN.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+UPDATE users SET role='SUPER_ADMIN' WHERE role='admin';
+UPDATE users SET role='CUSTOMER' WHERE role='customer';
+ALTER TABLE users ALTER COLUMN role SET DEFAULT 'CUSTOMER';
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('CUSTOMER','SUPER_ADMIN'));
+
+-- Saved delivery addresses.
+CREATE TABLE IF NOT EXISTS addresses (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label      TEXT NOT NULL DEFAULT 'Home',
+  name       TEXT NOT NULL,
+  phone      TEXT NOT NULL,
+  line1      TEXT NOT NULL,
+  city       TEXT NOT NULL,
+  state      TEXT NOT NULL,
+  pincode    TEXT NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS addresses_user_idx ON addresses(user_id);
+
+-- One payment record per order (Razorpay or cash on delivery). Payment state lives here, not in orders.status.
+CREATE TABLE IF NOT EXISTS payments (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id            UUID NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
+  provider            TEXT NOT NULL CHECK (provider IN ('razorpay','cod')),
+  status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','failed','cancelled')),
+  amount_paise        INTEGER NOT NULL,
+  currency            TEXT NOT NULL DEFAULT 'INR',
+  razorpay_order_id   TEXT UNIQUE,
+  razorpay_payment_id TEXT UNIQUE,
+  failure_reason      TEXT,
+  paid_at             TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id);
+
+-- Orders created before the payments table: give each one a payment record based on its old status.
+INSERT INTO payments(order_id, user_id, provider, status, amount_paise, paid_at, created_at)
+SELECT o.id, o.user_id,
+       CASE WHEN o.payment_method='cod' THEN 'cod' ELSE 'razorpay' END,
+       CASE WHEN o.status='paid' THEN 'paid'
+            WHEN o.status='failed' THEN 'failed'
+            WHEN o.status='cancelled' THEN 'cancelled'
+            WHEN o.status='delivered' THEN 'paid'
+            WHEN o.payment_method='online' AND o.status='shipped' THEN 'paid'
+            ELSE 'pending' END,
+       o.total_paise,
+       CASE WHEN o.status IN ('paid','delivered') OR (o.payment_method='online' AND o.status='shipped') THEN o.created_at END,
+       o.created_at
+FROM orders o WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id);
+
+-- Order status is now only the fulfilment stage.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+UPDATE orders SET status='confirmed' WHERE status='paid';
+UPDATE orders SET status='cancelled' WHERE status='failed';
 ALTER TABLE orders ADD CONSTRAINT orders_status_check
-  CHECK (status IN ('pending','confirmed','paid','shipped','delivered','cancelled','failed'));
+  CHECK (status IN ('pending','confirmed','processing','shipped','delivered','cancelled'));
+
+-- Forgot-password links (only a hash of the token is stored).
+CREATE TABLE IF NOT EXISTS password_resets (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
