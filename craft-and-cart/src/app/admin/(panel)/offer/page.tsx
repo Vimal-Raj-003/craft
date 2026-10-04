@@ -45,7 +45,7 @@ export default async function OfferAdmin() {
     <>
       <p className="text-sm text-dim">
         Choose the product customers can buy for ₹1 and the product they can buy for ₹2 on their <b>first order</b> (signed-in, once per customer and phone number, online payment).
-        Only one unit of each gets the promo price; everything else is normal price. A product cannot be both.
+        Only one unit of each gets the promo price; everything else is normal price. The promotional units always ship FREE, and so does any product priced ₹300 or below. A product cannot be both.
       </p>
       {([1, 2] as const).map((n) => problem(n) && <p key={n} className="mt-3 rounded-2xl border border-amber/40 bg-amber/10 p-3 text-sm">⚠️ {problem(n)}</p>)}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">

@@ -45,7 +45,7 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 - Products and prices always come from the database, never from the browser.
 
 **Cart and checkout**
-- Cart that remembers items between visits, with a free-shipping progress bar (free over ₹999, otherwise ₹79).
+- Cart that remembers items between visits, with a free-shipping progress bar. **Shipping:** FREE when every item is priced ₹300 or below (or is the ₹1/₹2 first-order promo unit); otherwise ₹79, free on orders of ₹999 or more.
 - Checkout with address validation and a choice of **Razorpay** or **Cash on Delivery**. Customers must sign in to order, so every order and payment belongs to an account.
 - Order status page that updates itself while a payment is being confirmed; stock is reduced only when an order is confirmed.
 

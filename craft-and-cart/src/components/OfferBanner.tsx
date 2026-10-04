@@ -12,6 +12,7 @@ const FINE_PRINT = [
   "Important: A failed payment attempt may consume the offer.",
   "If your eligible order is cancelled, the offer will be restored.",
   "Promo prices apply when you pay online (Razorpay).",
+  "The ₹1 and ₹2 promotional products ship FREE.",
 ];
 
 const prices = (offers: OfferProduct[]) => offers.map((o) => formatINR(o.offerPaise)).join(" & ");

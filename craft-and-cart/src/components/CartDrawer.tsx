@@ -3,7 +3,7 @@ import { useMounted } from "@/lib/use-mounted";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useCart, cartSubtotal } from "@/lib/cart";
-import { formatINR, shippingFor, FREE_SHIPPING_OVER } from "@/lib/money";
+import { cartShipsFree, formatINR, shippingFor, FREE_SHIPPING_OVER } from "@/lib/money";
 import { useOffer } from "@/lib/use-offer";
 import OfferBanner from "./OfferBanner";
 
@@ -20,7 +20,11 @@ export default function CartDrawer() {
         return line ? sum + Math.max(0, line.pricePaise - o.offerPaise) : sum; // one unit of each promotional product
       }, 0);
   const payable = subtotal - discount;
-  const progress = Math.min(payable / FREE_SHIPPING_OVER, 1);
+  // Shipping preview (the server decides the real charge): FREE when every unit is ≤ ₹300 or an applied ₹1/₹2 promo unit.
+  const promoIds = mounted && offerState?.eligible ? offerState.offers.map((o) => o.productId) : [];
+  const shipFree = mounted && lines.length > 0 && cartShipsFree(lines, promoIds);
+  const shipping = shipFree ? 0 : shippingFor(payable);
+  const progress = shipFree ? 1 : Math.min(payable / FREE_SHIPPING_OVER, 1);
 
   return (
     <AnimatePresence>
@@ -45,7 +49,7 @@ export default function CartDrawer() {
 
             <div className="mb-5 rounded-2xl bg-[#7a1d00]/5 p-3 text-sm">
               <p className="mb-2 text-dim">
-                {payable >= FREE_SHIPPING_OVER ? "🎉 Free shipping unlocked!" : `Add ${formatINR(FREE_SHIPPING_OVER - payable)} more for free shipping`}
+                {shipFree ? "🎉 FREE Shipping on everything in your cart!" : payable >= FREE_SHIPPING_OVER ? "🎉 FREE Shipping unlocked!" : `Add ${formatINR(FREE_SHIPPING_OVER - payable)} more for free shipping (items ₹300 and below always ship free)`}
               </p>
               <div className="h-1.5 overflow-hidden rounded-full bg-[#7a1d00]/10">
                 <motion.div className="h-full rounded-full bg-gradient-to-r from-pink to-mint" animate={{ width: `${progress * 100}%` }} />
@@ -89,8 +93,8 @@ export default function CartDrawer() {
               {discount > 0 && (
                 <div className="flex justify-between text-mint"><span>First order promo discount <span className="text-xs text-dim">(pay online)</span></span><span>−{formatINR(discount)}</span></div>
               )}
-              <div className="flex justify-between text-dim"><span>Shipping</span><span>{shippingFor(payable) === 0 ? "Free" : formatINR(shippingFor(payable))}</span></div>
-              <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatINR(payable + shippingFor(payable))}</span></div>
+              <div className="flex justify-between text-dim"><span>Shipping</span><span className={shipping === 0 ? "font-semibold text-mint" : ""}>{shipping === 0 ? "FREE Shipping" : formatINR(shipping)}</span></div>
+              <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatINR(payable + shipping)}</span></div>
               <Link href="/checkout" onClick={() => setOpen(false)}
                 className={`btn btn-primary mt-3 w-full ${!lines.length ? "pointer-events-none opacity-40" : ""}`}>
                 Checkout securely →

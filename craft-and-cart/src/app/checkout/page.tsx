@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, cartSubtotal } from "@/lib/cart";
-import { formatINR, shippingFor } from "@/lib/money";
+import { cartShipsFree, formatINR, shippingFor } from "@/lib/money";
 import { useMounted } from "@/lib/use-mounted";
 import OfferBanner from "@/components/OfferBanner";
 
-type QuoteLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; promo: boolean };
+type QuoteLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; promo: boolean; freeShipping: boolean };
 type Quote = {
-  lines: QuoteLine[]; subtotal: number; discount: number; shipping: number; total: number;
+  lines: QuoteLine[]; subtotal: number; discount: number; shipping: number; shippingFree: boolean; total: number;
   offer: { products: { id: number; name: string; normalPaise: number; offerPaise: number; applied: boolean }[]; eligible: boolean; applied: boolean; reason: string | null };
 };
 
@@ -84,7 +84,7 @@ export default function Checkout() {
   const localSubtotal = mounted ? cartSubtotal(lines) : 0;
   const subtotal = quote?.subtotal ?? localSubtotal;
   const discount = quote?.discount ?? 0;
-  const shipping = quote?.shipping ?? shippingFor(localSubtotal);
+  const shipping = quote?.shipping ?? (cartShipsFree(lines) ? 0 : shippingFor(localSubtotal));
   const total = quote?.total ?? localSubtotal + shipping;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -247,7 +247,7 @@ export default function Checkout() {
           {quote?.offer.eligible && quote.offer.reason !== "online_only" && quote.offer.products.some((p) => !p.applied) && <OfferBanner variant="mini" />}          {mounted && (quote
             ? quote.lines.map((l, i) => (
                 <div key={`${l.productId}-${l.color}-${i}`} className="flex justify-between gap-3 text-sm">
-                  <span className="text-dim">{l.name} {l.color && `· ${l.color}`} × {l.qty}{l.promo && <b className="ml-1 text-mint">(first order offer)</b>}</span>
+                  <span className="text-dim">{l.name} {l.color && `· ${l.color}`} × {l.qty}{l.promo && <b className="ml-1 text-mint">(first order offer)</b>}{!quote.shippingFree && l.freeShipping && <b className="ml-1 text-xs text-mint">FREE Shipping</b>}</span>
                   <span>{formatINR(l.unitPaise * l.qty)}</span>
                 </div>
               ))
@@ -260,7 +260,7 @@ export default function Checkout() {
           <div className="space-y-2 border-t border-[#7a1d00]/15 pt-4 text-sm">
             <div className="flex justify-between text-dim"><span>{discount > 0 ? "Original Total" : "Subtotal"}</span><span>{formatINR(subtotal)}</span></div>
             {discount > 0 && <div className="flex justify-between text-mint"><span>First Order Promo Discount</span><span>−{formatINR(discount)}</span></div>}
-            <div className="flex justify-between text-dim"><span>Shipping</span><span>{shipping ? formatINR(shipping) : "Free"}</span></div>
+            <div className="flex justify-between text-dim"><span>Shipping</span><span className={shipping ? "" : "font-semibold text-mint"}>{shipping ? formatINR(shipping) : "FREE Shipping"}</span></div>
             <div className="flex justify-between text-xl font-bold"><span>{discount > 0 ? "Final Payable" : "Total"}</span><span>{formatINR(total)}</span></div>
           </div>
           {err && <p className="rounded-xl bg-pink/10 p-3 text-sm text-pink" role="alert">{err}</p>}

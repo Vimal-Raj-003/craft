@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { motion } from "motion/react";
 import { useCart } from "@/lib/cart";
 import { flyToCart } from "@/lib/fly";
-import { formatINR } from "@/lib/money";
+import { FREE_SHIPPING_ITEM_MAX, formatINR } from "@/lib/money";
 import ProductArt from "./ProductArt";
 import type { Product } from "@/lib/db";
 
@@ -57,6 +57,7 @@ export default function ProductCard({ p, index = 0, promoPaise }: { p: Product; 
               <span className="whitespace-nowrap text-[15px] font-semibold text-mint sm:text-base">{formatINR(p.price_paise)}</span>
             </div>
             <p className="mt-1 line-clamp-1 text-xs text-dim sm:text-sm">{p.tagline}</p>
+            {(p.price_paise <= FREE_SHIPPING_ITEM_MAX || promoPaise !== undefined) && <p className="mt-1 text-xs font-semibold text-mint">FREE Shipping{p.price_paise > FREE_SHIPPING_ITEM_MAX && " on the offer unit"}</p>}
             {p.rating && <p className="mt-2 text-xs text-amber">{"★".repeat(Math.round(p.rating))} <span className="text-dim">({p.review_count})</span></p>}
           </div>
         </Link>

@@ -63,7 +63,11 @@ export default function ProductForm({ initial, categories }: { initial: ProductF
           </label>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className={label}>Normal price (₹)<input className="input mt-1" type="number" min="1" step="0.01" required value={v.priceRupees} onChange={(e) => set("priceRupees", e.target.value)} /></label>
+          <label className={label}>Normal price (₹)<input className="input mt-1" type="number" min="1" step="0.01" required value={v.priceRupees} onChange={(e) => set("priceRupees", e.target.value)} />
+            <span className={`mt-1 block text-xs ${Number(v.priceRupees) > 0 && Number(v.priceRupees) <= 300 ? "font-semibold text-mint" : "text-dim"}`}>
+              {Number(v.priceRupees) > 0 && Number(v.priceRupees) <= 300 ? "FREE Shipping (priced ₹300 or below)" : "Standard shipping applies (free over ₹999 orders)"}
+            </span>
+          </label>
           <label className={label}>Stock<input className="input mt-1" type="number" min="0" step="1" required value={v.stock} onChange={(e) => set("stock", e.target.value)} /></label>
         </div>
         <label className={label}>Short tagline<input className="input mt-1" maxLength={160} value={v.tagline} onChange={(e) => set("tagline", e.target.value)} /></label>

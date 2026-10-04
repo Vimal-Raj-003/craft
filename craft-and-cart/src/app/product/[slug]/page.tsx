@@ -4,7 +4,7 @@ import AddToCart from "@/components/AddToCart";
 import ProductCard from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { getProduct, listProducts, listReviews } from "@/lib/db";
-import { formatINR } from "@/lib/money";
+import { FREE_SHIPPING_ITEM_MAX, formatINR } from "@/lib/money";
 import { getActiveOffers } from "@/lib/offer";
 import OfferBanner from "@/components/OfferBanner";
 import ProductArt from "@/components/ProductArt";
@@ -44,7 +44,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
           {p.rating && <p className="mt-4 text-amber">{"★".repeat(Math.round(p.rating))} <span className="text-sm text-dim">{p.rating} · {p.review_count} {p.review_count === 1 ? "review" : "reviews"}</span></p>}
           <p className="mt-6 text-4xl font-bold text-gradient">{formatINR(p.price_paise)}</p>
           <p className="mt-6 leading-relaxed text-dim">{p.description}</p>
-          <p className="mt-4 text-sm text-dim">{p.stock > 0 ? (p.stock <= 5 ? `Only ${p.stock} left` : "In stock") : "Currently sold out"} · Free shipping over ₹999</p>
+          <p className="mt-4 text-sm text-dim">{p.stock > 0 ? (p.stock <= 5 ? `Only ${p.stock} left` : "In stock") : "Currently sold out"} · {p.price_paise <= FREE_SHIPPING_ITEM_MAX ? <b className="text-mint">FREE Shipping</b> : isPromo ? "The first-order offer unit ships FREE; otherwise free shipping over ₹999" : "Free shipping over ₹999"}</p>
           {isPromo && <div className="mt-6"><OfferBanner variant="compact" /></div>}
           <AddToCart p={p} />
         </Reveal>

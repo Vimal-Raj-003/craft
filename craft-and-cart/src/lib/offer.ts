@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { pool } from "./db";
-import { shippingFor } from "./money";
+import { isFreeShippingUnit, shippingFor } from "./money";
 
 // "First order promotional products": up to TWO selected products (slot 1 = the ₹1 product, slot 2 = the ₹2 product).
 // In a signed-in customer's FIRST order, ONE unit of each promotional product costs its promo price; every other unit
@@ -84,7 +84,7 @@ export async function checkEligibility(q: Q, userId: string, deliveryPhone?: str
 // Pricing
 
 export type QuoteItem = { productId: number; qty: number; color?: string };
-export type PricedLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; normalPaise: number; promo: boolean };
+export type PricedLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; normalPaise: number; promo: boolean; freeShipping: boolean };
 export type ProductRow = { id: number; name: string; price_paise: number; stock: number };
 
 export type OfferInfo = {
@@ -102,7 +102,8 @@ export type Quote =
       products: Map<number, ProductRow>;
       subtotal: number; // normal prices
       discount: number; // total of all promotional discounts
-      shipping: number; // existing rule, applied to what is actually charged for the items
+      shipping: number; // ₹0 when every unit is free-shipping eligible, otherwise the existing rule on what is charged
+      shippingFree: boolean; // every unit in the cart is free-shipping eligible
       total: number;
       promos: ActiveOffer[]; // the promotional products whose price was applied
       offer: OfferInfo;
@@ -124,11 +125,11 @@ export function priceItems(items: QuoteItem[], byId: Map<number, ProductRow>, pr
     const promo = promos.find((o) => o.productId === it.productId);
     if (promo && !used.has(promo.productId)) {
       used.add(promo.productId);
-      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: 1, unitPaise: promo.offerPaise, normalPaise: p.price_paise, promo: true });
+      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: 1, unitPaise: promo.offerPaise, normalPaise: p.price_paise, promo: true, freeShipping: true });
       discount += p.price_paise - promo.offerPaise;
-      if (it.qty > 1) lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty - 1, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false });
+      if (it.qty > 1) lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty - 1, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false, freeShipping: isFreeShippingUnit(p.price_paise) });
     } else {
-      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false });
+      lines.push({ productId: p.id, name: p.name, color: it.color ?? null, qty: it.qty, unitPaise: p.price_paise, normalPaise: p.price_paise, promo: false, freeShipping: isFreeShippingUnit(p.price_paise) });
     }
   }
   return { lines, subtotal, discount };
@@ -167,7 +168,9 @@ export async function computeQuote(
   }
 
   const { lines, subtotal, discount } = priceItems(opts.items, byId, promos);
-  const shipping = shippingFor(subtotal - discount);
+  // Shipping: every unit free-shipping eligible (promo units, or normal price ≤ ₹300) -> FREE. Otherwise the existing rule.
+  const shippingFree = lines.every((l) => l.freeShipping);
+  const shipping = shippingFree ? 0 : shippingFor(subtotal - discount);
   return {
     ok: true,
     lines,
@@ -175,6 +178,7 @@ export async function computeQuote(
     subtotal,
     discount,
     shipping,
+    shippingFree,
     total: subtotal - discount + shipping,
     promos,
     offer: {

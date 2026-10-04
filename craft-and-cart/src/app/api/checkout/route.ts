@@ -104,8 +104,8 @@ export async function POST(req: Request) {
     orderId = o.rows[0].id;
     for (const l of q.lines) {
       await client.query(
-        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise,promo,normal_price_paise) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
-        [orderId, l.productId, l.name, l.color, l.qty, l.unitPaise, l.promo, l.normalPaise],
+        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise,promo,normal_price_paise,free_shipping) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [orderId, l.productId, l.name, l.color, l.qty, l.unitPaise, l.promo, l.normalPaise, l.freeShipping],
       );
     }
     await client.query(

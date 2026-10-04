@@ -23,7 +23,7 @@ export type OrderDetail = {
   razorpay_payment_id: string | null;
   paid_at: Date | null;
   failure_reason: string | null;
-  items: { name: string; color: string | null; qty: number; price_paise: number; promo: boolean; normal_price_paise: number | null }[];
+  items: { name: string; color: string | null; qty: number; price_paise: number; promo: boolean; normal_price_paise: number | null; free_shipping: boolean | null }[];
 };
 
 /**
@@ -41,7 +41,7 @@ export async function getOrderDetail(id: string, ownerId?: string): Promise<Orde
   );
   if (!rows[0]) return null;
   const { rows: items } = await pool.query(
-    "SELECT name,color,qty,price_paise,promo,normal_price_paise FROM order_items WHERE order_id=$1 ORDER BY id",
+    "SELECT name,color,qty,price_paise,promo,normal_price_paise,free_shipping FROM order_items WHERE order_id=$1 ORDER BY id",
     [id],
   );
   return { ...rows[0], items };

@@ -1,4 +1,4 @@
-import { formatINR } from "@/lib/money";
+import { FREE_SHIPPING_ITEM_MAX, formatINR } from "@/lib/money";
 import type { OrderDetail } from "@/lib/order-queries";
 import StatusBadge from "./StatusBadge";
 
@@ -30,7 +30,7 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
           <tbody>
             {o.items.map((i, n) => (
               <tr key={n} className="border-t border-[#7a1d00]/15">
-                <td className="p-4">{i.name}{i.color && <span className="text-dim"> · {i.color}</span>}{i.promo && <b className="ml-2 rounded-full bg-mint/15 px-2 py-0.5 text-xs text-mint">offer price</b>}</td>
+                <td className="p-4">{i.name}{i.color && <span className="text-dim"> · {i.color}</span>}{i.promo && <b className="ml-2 rounded-full bg-mint/15 px-2 py-0.5 text-xs text-mint">offer price</b>}{(i.free_shipping ?? (i.promo || (i.normal_price_paise ?? i.price_paise) <= FREE_SHIPPING_ITEM_MAX)) && <span className="ml-2 text-xs font-semibold text-mint">FREE Shipping</span>}</td>
                 <td>{i.qty}</td>
                 <td>{formatINR(i.price_paise)}</td>
                 <td className="pr-4 text-right">{formatINR(i.price_paise * i.qty)}</td>
@@ -40,7 +40,7 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
           <tfoot className="border-t border-[#7a1d00]/15">
             <tr><td className="px-4 pt-3 text-dim" colSpan={3}>{o.discount_paise > 0 ? "Original total" : "Subtotal"}</td><td className="pr-4 pt-3 text-right">{formatINR(o.subtotal_paise)}</td></tr>
             {o.discount_paise > 0 && <tr><td className="px-4 text-mint" colSpan={3}>First Order Promo Discount</td><td className="pr-4 text-right text-mint">−{formatINR(o.discount_paise)}</td></tr>}
-            <tr><td className="px-4 text-dim" colSpan={3}>Shipping</td><td className="pr-4 text-right">{o.shipping_paise ? formatINR(o.shipping_paise) : "Free"}</td></tr>
+            <tr><td className="px-4 text-dim" colSpan={3}>Shipping</td><td className="pr-4 text-right">{o.shipping_paise ? formatINR(o.shipping_paise) : <b className="text-mint">FREE Shipping</b>}</td></tr>
             <tr className="font-bold"><td className="px-4 pb-4 pt-1" colSpan={3}>{o.discount_paise > 0 ? "Final payable" : "Total"}</td><td className="pr-4 pb-4 pt-1 text-right">{formatINR(o.total_paise)}</td></tr>
           </tfoot>
         </table>
@@ -63,6 +63,7 @@ export default function OrderDetailCard({ o, children }: { o: OrderDetail; child
                 );
               })}
               <div className="flex justify-between gap-4"><dt className="text-dim">Total discount</dt><dd>{formatINR(o.discount_paise)}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-dim">Shipping charge</dt><dd>{o.shipping_paise ? formatINR(o.shipping_paise) : "FREE (promotional units ship free)"}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-dim">Final order amount</dt><dd>{formatINR(o.total_paise)}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-dim">Offer status</dt><dd className="text-right">{o.offer_status ? (label[o.offer_status] ?? o.offer_status) : "—"}</dd></div>
             </dl>

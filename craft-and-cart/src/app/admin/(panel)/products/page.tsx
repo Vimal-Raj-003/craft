@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { pool } from "@/lib/db";
-import { formatINR } from "@/lib/money";
+import { FREE_SHIPPING_ITEM_MAX, formatINR } from "@/lib/money";
 
 export default async function AdminProducts({ searchParams }: PageProps<"/admin/products">) {
   const sp = await searchParams;
@@ -25,8 +25,8 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
       </div>
       <p className="mt-4 text-sm text-dim">{rows.length} product{rows.length === 1 ? "" : "s"}</p>
       <div className="glass mt-3 overflow-x-auto rounded-2xl">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="text-dim"><tr><th className="p-4">Product</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th className="pr-4">Status</th></tr></thead>
+        <table className="w-full min-w-[980px] text-left text-sm [&_td]:pr-4 [&_th]:pr-4">
+          <thead className="text-dim"><tr><th className="p-4">Product</th><th>SKU</th><th>Category</th><th>Normal price</th><th>Promo price</th><th>Shipping</th><th>Stock</th><th className="pr-4">Status</th></tr></thead>
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} className="border-t border-[#7a1d00]/15">
@@ -42,11 +42,13 @@ export default async function AdminProducts({ searchParams }: PageProps<"/admin/
                 <td className="font-mono text-xs">{p.sku}</td>
                 <td className="text-dim">{p.category ?? "—"}</td>
                 <td>{formatINR(p.price_paise)}</td>
+                <td>{p.promo_paise != null ? <b className="text-mint">{formatINR(p.promo_paise)}</b> : "—"}</td>
+                <td className="text-xs">{p.price_paise <= FREE_SHIPPING_ITEM_MAX ? <b className="text-mint">FREE</b> : p.promo_paise != null ? "Standard (offer unit FREE)" : "Standard"}</td>
                 <td className={p.stock <= 5 ? "font-semibold text-pink" : ""}>{p.stock}</td>
                 <td className="pr-4"><span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${p.active ? "bg-mint/15 text-mint" : "bg-black/5 text-dim"}`}>{p.active ? "Active" : "Inactive"}</span></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td className="p-6 text-dim" colSpan={6}>No products found.</td></tr>}
+            {rows.length === 0 && <tr><td className="p-6 text-dim" colSpan={8}>No products found.</td></tr>}
           </tbody>
         </table>
       </div>

@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     subtotal: q.subtotal,
     discount: q.discount,
     shipping: q.shipping,
+    shippingFree: q.shippingFree,
     total: q.total,
     offer: q.offer,
     signedIn: Boolean(session),

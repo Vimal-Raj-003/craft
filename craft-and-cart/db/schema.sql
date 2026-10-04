@@ -238,3 +238,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_slot_active ON first_order_o
 CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_product_active ON first_order_offer (product_id) WHERE active;
 -- the normal price of every ordered unit, so an order always shows "normal price -> offer price"
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS normal_price_paise INTEGER;
+
+-- Free-shipping rule: whether each ordered unit line was free-shipping eligible when it was ordered.
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS free_shipping BOOLEAN;
