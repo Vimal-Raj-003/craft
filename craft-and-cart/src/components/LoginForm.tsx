@@ -1,12 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-
-/** Only ever go to a path on this site after signing in. */
-const safeNext = () => {
-  const n = new URLSearchParams(window.location.search).get("next");
-  return n && n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : null;
-};
+import { AFTER_LOGIN_HOME, safeNext } from "@/lib/safe-next";
 
 export default function LoginForm({ initialMode }: { initialMode: "login" | "register" }) {
   const [mode, setMode] = useState<"login" | "register">(initialMode);
@@ -22,7 +17,9 @@ export default function LoginForm({ initialMode }: { initialMode: "login" | "reg
       const r = await fetch(`/api/auth/${mode}`, { method: "POST", body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok) { setErr(d.error ?? "Something went wrong"); setBusy(false); return; }
-      window.location.href = safeNext() ?? (d.user.role === "SUPER_ADMIN" ? "/admin/dashboard" : "/account");
+      // back to the page they wanted (e.g. checkout), otherwise straight to the products - never to /account
+      const next = safeNext(new URLSearchParams(window.location.search).get("next"));
+      window.location.href = next ?? (d.user.role === "SUPER_ADMIN" ? "/admin/dashboard" : AFTER_LOGIN_HOME);
     } catch {
       setErr("Network problem. Please try again."); setBusy(false);
     }

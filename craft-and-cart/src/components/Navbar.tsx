@@ -24,6 +24,8 @@ export default function Navbar() {
   // the phone menu is "open for this page": navigating to another page closes it automatically
   const [menuAt, setMenuAt] = useState<string | null>(null);
   const menu = menuAt === pathname;
+  // after signing in, come back to the page the visitor was on
+  const signIn = pathname === "/" || pathname.startsWith("/login") ? "/login" : `/login?next=${encodeURIComponent(pathname)}`;
 
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => setUser(d.user)).catch(() => {});
@@ -79,7 +81,7 @@ export default function Navbar() {
 
           <div className="flex items-center gap-1 sm:gap-2">
             <Link
-              href={user ? "/account" : "/login"}
+              href={user ? "/account" : signIn}
               className="hidden rounded-full px-3.5 py-2.5 text-sm text-[#fff4e0]/85 transition hover:bg-white/10 hover:text-white md:block"
             >
               {user ? user.name.split(" ")[0] : "Sign in"}
@@ -136,7 +138,7 @@ export default function Navbar() {
                   </li>
                 ))}
                 <li>
-                  <Link href={user ? "/account" : "/login"} onClick={() => setMenuAt(null)} className="flex min-h-12 items-center rounded-2xl px-4 text-lg font-medium transition active:bg-white/15">
+                  <Link href={user ? "/account" : signIn} onClick={() => setMenuAt(null)} className="flex min-h-12 items-center rounded-2xl px-4 text-lg font-medium transition active:bg-white/15">
                     {user ? `Hi, ${user.name.split(" ")[0]} · My orders` : "Sign in"}
                   </Link>
                 </li>

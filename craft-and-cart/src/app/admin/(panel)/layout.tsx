@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await getAdmin();
   if (!admin) {
-    // A signed-in customer is sent to their own account, never shown anything from the admin area.
-    redirect((await getSession()) ? "/account" : "/admin/login");
+    // A signed-in customer is sent back to the shop, never shown anything from the admin area.
+    redirect((await getSession()) ? "/shop" : "/admin/login");
   }
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-32 sm:px-6 sm:pt-36">
