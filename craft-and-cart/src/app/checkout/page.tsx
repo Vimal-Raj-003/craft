@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCart, cartSubtotal } from "@/lib/cart";
 import { formatINR, shippingFor } from "@/lib/money";
 import { useMounted } from "@/lib/use-mounted";
+import OfferBanner from "@/components/OfferBanner";
+
+type QuoteLine = { productId: number; name: string; color: string | null; qty: number; unitPaise: number; promo: boolean };
+type Quote = {
+  lines: QuoteLine[]; subtotal: number; discount: number; shipping: number; total: number;
+  offer: { product: { name: string; normalPaise: number; offerPaise: number } | null; eligible: boolean; applied: boolean; reason: string | null };
+};
 
 type Method = "online" | "cod";
 type Addr = { id: string; label: string; name: string; phone: string; line1: string; city: string; state: string; pincode: string; is_default: boolean };
@@ -56,9 +63,29 @@ export default function Checkout() {
     }).catch(() => {});
   }, []);
 
-  const subtotal = mounted ? cartSubtotal(lines) : 0;
-  const shipping = shippingFor(subtotal);
-  const total = subtotal + shipping;
+  // The server decides the price (including the first-order offer); this is what it would charge.
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const itemsKey = JSON.stringify(lines.map((l) => [l.productId, l.qty, l.color]));
+  useEffect(() => {
+    if (!mounted || signedIn !== true || lines.length === 0) return;
+    const t = setTimeout(() => {
+      fetch("/api/checkout/quote", {
+        method: "POST",
+        body: JSON.stringify({ paymentMethod: method, phone: f.phone, items: lines.map((l) => ({ productId: l.productId, qty: l.qty, color: l.color })) }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((q) => setQuote(q))
+        .catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, signedIn, method, f.phone, itemsKey]);
+
+  const localSubtotal = mounted ? cartSubtotal(lines) : 0;
+  const subtotal = quote?.subtotal ?? localSubtotal;
+  const discount = quote?.discount ?? 0;
+  const shipping = quote?.shipping ?? shippingFor(localSubtotal);
+  const total = quote?.total ?? localSubtotal + shipping;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   const report = (body: Record<string, unknown>) =>
@@ -126,12 +153,15 @@ export default function Checkout() {
   if (signedIn === false)
     return (
       <div className="grid min-h-screen place-items-center px-4 pb-10 pt-28 text-center">
-        <div className="glass max-w-md space-y-4 rounded-3xl p-8">
+        <div className="w-full max-w-md space-y-4">
+        <div className="glass space-y-4 rounded-3xl p-8">
           <p className="text-5xl">🧶</p>
           <h1 className="text-2xl font-bold">Sign in to check out</h1>
           <p className="text-dim">Your cart is saved. Sign in or create a free account so we can keep your orders and payments safe.</p>
           <Link href="/login?next=/checkout" className="btn btn-primary min-h-12 w-full">Sign in</Link>
           <Link href="/login?next=/checkout&mode=register" className="btn btn-ghost min-h-12 w-full">Create an account</Link>
+        </div>
+        <div className="text-left"><OfferBanner variant="compact" /></div>
         </div>
       </div>
     );
@@ -199,16 +229,37 @@ export default function Checkout() {
 
         <div className="glass h-fit space-y-3 rounded-3xl p-6 sm:p-8">
           <h2 className="text-xl font-semibold">Order summary</h2>
-          {mounted && lines.map((l) => (
-            <div key={`${l.productId}-${l.color}`} className="flex justify-between gap-3 text-sm">
-              <span className="text-dim">{l.emoji} {l.name} {l.color && `· ${l.color}`} × {l.qty}</span>
-              <span>{formatINR(l.pricePaise * l.qty)}</span>
+          {quote?.offer.applied && quote.offer.product && (
+            <div className="rounded-2xl border-2 border-dashed border-[#a8321a]/40 bg-[#fff8e6]/80 p-4 text-sm">
+              <p className="inline-block rounded-full bg-gradient-to-r from-pink to-violet px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">First Order ₹1 Offer</p>
+              <p className="mt-2 font-semibold">{quote.offer.product.name}</p>
+              <p className="text-dim">Normal Price: <span className="line-through">{formatINR(quote.offer.product.normalPaise)}</span></p>
+              <p className="text-dim">First Order Price: <span className="font-bold text-mint">{formatINR(quote.offer.product.offerPaise)}</span></p>
+              <p className="mt-2 text-xs text-dim">Only one unit is ₹1; other items stay at normal price. A failed payment attempt may consume the offer; if this order is cancelled the offer is restored.</p>
             </div>
-          ))}
+          )}
+          {quote?.offer.eligible && !quote.offer.applied && quote.offer.reason === "online_only" && (
+            <p className="rounded-xl bg-amber/10 p-3 text-sm text-dim">Your ₹1 First Order offer is available when you <b className="text-ink">pay online</b>. Choose &ldquo;Pay online with Razorpay&rdquo; to use it.</p>
+          )}
+          {quote?.offer.eligible && !quote.offer.applied && quote.offer.reason === "not_in_cart" && <OfferBanner variant="compact" />}
+          {mounted && (quote
+            ? quote.lines.map((l, i) => (
+                <div key={`${l.productId}-${l.color}-${i}`} className="flex justify-between gap-3 text-sm">
+                  <span className="text-dim">{l.name} {l.color && `· ${l.color}`} × {l.qty}{l.promo && <b className="ml-1 text-mint">(₹1 offer)</b>}</span>
+                  <span>{formatINR(l.unitPaise * l.qty)}</span>
+                </div>
+              ))
+            : lines.map((l) => (
+                <div key={`${l.productId}-${l.color}`} className="flex justify-between gap-3 text-sm">
+                  <span className="text-dim">{l.name} {l.color && `· ${l.color}`} × {l.qty}</span>
+                  <span>{formatINR(l.pricePaise * l.qty)}</span>
+                </div>
+              )))}
           <div className="space-y-2 border-t border-[#7a1d00]/15 pt-4 text-sm">
-            <div className="flex justify-between text-dim"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
+            <div className="flex justify-between text-dim"><span>{discount > 0 ? "Original Total" : "Subtotal"}</span><span>{formatINR(subtotal)}</span></div>
+            {discount > 0 && <div className="flex justify-between text-mint"><span>First Order ₹1 Product Discount</span><span>−{formatINR(discount)}</span></div>}
             <div className="flex justify-between text-dim"><span>Shipping</span><span>{shipping ? formatINR(shipping) : "Free"}</span></div>
-            <div className="flex justify-between text-xl font-bold"><span>Total</span><span>{formatINR(total)}</span></div>
+            <div className="flex justify-between text-xl font-bold"><span>{discount > 0 ? "Final Payable" : "Total"}</span><span>{formatINR(total)}</span></div>
           </div>
           {err && <p className="rounded-xl bg-pink/10 p-3 text-sm text-pink" role="alert">{err}</p>}
           <button className="btn btn-primary w-full" disabled={busy || !mounted || signedIn === null}>

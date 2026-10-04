@@ -18,6 +18,7 @@ if (process.env.NODE_ENV !== "production") globalForPg.pgPool = pool;
 export type Product = {
   id: number;
   slug: string;
+  sku: string | null;
   name: string;
   tagline: string;
   description: string;
@@ -36,7 +37,8 @@ export type Product = {
 };
 
 const PRODUCT_SELECT = `
-  SELECT p.*, c.slug AS category_slug, c.name AS category_name,
+  SELECT p.id, p.slug, p.sku, p.name, p.tagline, p.description, p.price_paise, p.stock, p.colors, p.hue_a, p.hue_b, p.emoji,
+         p.image_url, p.featured, c.slug AS category_slug, c.name AS category_name,
          (SELECT round(avg(rating)::numeric,1)::float FROM reviews r WHERE r.product_id=p.id) AS rating,
          (SELECT count(*)::int FROM reviews r WHERE r.product_id=p.id) AS review_count
   FROM products p LEFT JOIN categories c ON c.id=p.category_id`;

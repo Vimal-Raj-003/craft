@@ -30,6 +30,8 @@ RUN npx esbuild scripts/seed.ts --bundle --platform=node --target=node22 --forma
       --external:pg --outfile=dist/db-setup.cjs
 RUN npx esbuild scripts/create-admin.ts --bundle --platform=node --target=node22 --format=cjs \
       --external:pg --outfile=dist/create-admin.cjs
+RUN npx esbuild scripts/add-catalog.ts --bundle --platform=node --target=node22 --format=cjs \
+      --external:pg --outfile=dist/add-catalog.cjs
 
 # ---------- 3. run it ----------
 FROM node:${NODE_VERSION}-alpine AS runner
@@ -47,6 +49,7 @@ COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/db ./db
 COPY --from=builder --chown=node:node /app/dist/db-setup.cjs ./scripts/db-setup.cjs
 COPY --from=builder --chown=node:node /app/dist/create-admin.cjs ./scripts/create-admin.cjs
+COPY --from=builder --chown=node:node /app/dist/add-catalog.cjs ./scripts/add-catalog.cjs
 # Next.js writes optimised images here at runtime
 RUN mkdir -p .next/cache && chown -R node:node .next
 

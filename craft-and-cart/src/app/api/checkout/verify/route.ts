@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { fail, sameOrigin } from "@/lib/http";
-import { confirmRazorpayPayment, recordPaymentProblem } from "@/lib/orders";
+import { confirmRazorpayPayment, recordPaymentProblem, spendOfferIfRazorpayReportsFailure } from "@/lib/orders";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 
 const Body = z.discriminatedUnion("event", [
@@ -41,6 +41,8 @@ export async function POST(req: Request) {
 
   if (b.event !== "success") {
     await recordPaymentProblem(o.id, b.event, b.reason ?? null);
+    // Only a failure that RAZORPAY itself reports spends the first-order offer; closing the window never does.
+    if (b.event === "failed") await spendOfferIfRazorpayReportsFailure(o.id);
     return NextResponse.json({ ok: true });
   }
 

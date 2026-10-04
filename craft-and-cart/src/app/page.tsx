@@ -4,6 +4,8 @@ import ProductCard from "@/components/ProductCard";
 import CustomForm from "@/components/CustomForm";
 import { Reveal } from "@/components/Reveal";
 import { listProducts, listCategories } from "@/lib/db";
+import { getActiveOffer } from "@/lib/offer";
+import OfferBanner from "@/components/OfferBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ const STEPS = [
 ];
 
 export default async function Home() {
-  const [featured, categories] = await Promise.all([listProducts({ featured: true }), listCategories()]);
+  const [featured, categories, offer] = await Promise.all([listProducts({ featured: true }), listCategories(), getActiveOffer()]);
 
   return (
     <>
@@ -38,6 +40,8 @@ export default async function Home() {
         </div>
       </div>
 
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6 sm:pt-16"><OfferBanner /></section>
+
       <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6 sm:pt-32">
         <Reveal>
           <p className="text-sm uppercase tracking-[.3em] text-mint">Collections</p>
@@ -47,7 +51,7 @@ export default async function Home() {
           {categories.map((c, i) => (
             <Reveal key={c.slug} delay={i * 0.08}>
               <Link href={`/shop?category=${c.slug}`} data-hot className="glass group relative block h-full overflow-hidden rounded-2xl p-4 transition hover:-translate-y-2 hover:border-pink/60 sm:rounded-3xl sm:p-6">
-                <span className="absolute -right-6 -top-6 text-8xl opacity-10 transition group-hover:rotate-12 group-hover:opacity-30">{["💐", "🔑", "🌺", "🐘"][i]}</span>
+                <span className="absolute -right-6 -top-6 text-8xl opacity-10 transition group-hover:rotate-12 group-hover:opacity-30">{["💐", "🔑", "🌺", "🐘", "🏡"][i]}</span>
                 <h3 className="text-lg font-semibold sm:text-xl">{c.name}</h3>
                 <p className="mt-2 text-[13px] text-dim sm:text-sm">{c.blurb}</p>
                 <p className="mt-4 text-sm text-mint transition group-hover:translate-x-2 sm:mt-6">Explore →</p>
@@ -66,7 +70,7 @@ export default async function Home() {
           <Link href="/shop" className="btn btn-ghost !min-h-11">View all →</Link>
         </Reveal>
         <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-12 sm:gap-6 lg:grid-cols-3">
-          {featured.slice(0, 6).map((p, i) => <ProductCard key={p.id} p={p} index={i} />)}
+          {featured.slice(0, 6).map((p, i) => <ProductCard key={p.id} p={p} index={i} promo={p.id === offer?.productId} />)}
         </div>
       </section>
 

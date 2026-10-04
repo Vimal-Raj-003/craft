@@ -1,5 +1,6 @@
 import { pool } from "./db";
 import { listOrderPayments, razorpayConfigured } from "./razorpay";
+import { consumeOfferOnFailure, markOfferUsed, restoreOfferForOrder } from "./offer";
 
 export const ORDER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -28,6 +29,7 @@ export async function confirmRazorpayPayment(orderId: string, razorpayPaymentId:
     }
     const o = await client.query("UPDATE orders SET status='confirmed' WHERE id=$1 AND status='pending' RETURNING id", [orderId]);
     if (o.rowCount) await client.query(DECREMENT_STOCK, [orderId]);
+    await markOfferUsed(client, orderId); // a verified payment spends the first-order offer (no-op for ordinary orders)
     await client.query("COMMIT");
     return true;
   } catch (e) {
@@ -84,15 +86,36 @@ export async function syncRazorpayOrder(orderId: string) {
   }
 }
 
+/**
+ * Razorpay says a payment attempt on this order really failed (asked of Razorpay itself, never taken from the browser):
+ * the first-order offer, if this order holds it, is spent.
+ */
+export async function spendOfferIfRazorpayReportsFailure(orderId: string) {
+  if (!razorpayConfigured()) return;
+  try {
+    const { rows } = await pool.query("SELECT razorpay_order_id FROM payments WHERE order_id=$1 AND provider='razorpay'", [orderId]);
+    if (!rows[0]?.razorpay_order_id) return;
+    const attempts = await listOrderPayments(rows[0].razorpay_order_id);
+    if (attempts.some((a) => a.status === "failed")) await consumeOfferOnFailure(pool, orderId);
+  } catch (e) {
+    console.error("Could not confirm the failed attempt with Razorpay", e);
+  }
+}
+
 /** Admin changes the fulfilment stage. Cash-on-delivery money is recorded as received once delivered. */
-export async function setOrderStatus(orderId: string, status: OrderStatus) {
+export async function setOrderStatus(orderId: string, status: OrderStatus): Promise<"ok" | "not_found" | "reopen_blocked"> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const cur = await client.query("SELECT status FROM orders WHERE id=$1 FOR UPDATE", [orderId]);
+    const cur = await client.query("SELECT status, offer_status FROM orders WHERE id=$1 FOR UPDATE", [orderId]);
     if (!cur.rows[0]) {
       await client.query("ROLLBACK");
-      return false;
+      return "not_found";
+    }
+    // A cancelled first-order-offer order has already given the offer back; reviving it would let the offer be used twice.
+    if (cur.rows[0].status === "cancelled" && status !== "cancelled" && cur.rows[0].offer_status) {
+      await client.query("ROLLBACK");
+      return "reopen_blocked";
     }
     await client.query("UPDATE orders SET status=$2 WHERE id=$1", [orderId, status]);
     if (status === "delivered") {
@@ -101,6 +124,7 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
         [orderId],
       );
     } else if (status === "cancelled") {
+      await restoreOfferForOrder(client, orderId); // only a genuinely CANCELLED order restores the offer (once)
       // stock was taken when the order was confirmed; give it back
       if (["confirmed", "processing"].includes(cur.rows[0].status)) {
         await client.query(
@@ -114,7 +138,7 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
       );
     }
     await client.query("COMMIT");
-    return true;
+    return "ok";
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;

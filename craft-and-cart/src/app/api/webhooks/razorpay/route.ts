@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { confirmRazorpayPayment, recordPaymentProblem } from "@/lib/orders";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+import { consumeOfferOnFailure } from "@/lib/offer";
 
 // Razorpay Dashboard → Account & Settings → Webhooks → Add:
 //   URL: https://craft.jilljill.in/api/webhooks/razorpay   Secret = RAZORPAY_WEBHOOK_SECRET
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     await confirmRazorpayPayment(row.order_id, pay.id);
   } else if (event.event === "payment.failed") {
     await recordPaymentProblem(row.order_id, "failed", pay.error_description ?? "Payment failed");
+    await consumeOfferOnFailure(pool, row.order_id); // a signed Razorpay failure notice spends the first-order offer (no-op once paid)
   }
   return NextResponse.json({ ok: true });
 }

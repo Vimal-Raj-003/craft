@@ -13,7 +13,8 @@
     "db:start": "tsx scripts/pg-server.ts",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:setup": "tsx scripts/seed.ts",
-    "admin:create": "tsx scripts/create-admin.ts"
+    "admin:create": "tsx scripts/create-admin.ts",
+    "catalog:add": "tsx scripts/add-catalog.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -26,6 +27,7 @@
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"

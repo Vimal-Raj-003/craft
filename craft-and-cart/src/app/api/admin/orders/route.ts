@@ -27,6 +27,8 @@ export async function PATCH(req: Request) {
   if (!(await getAdmin())) return fail("Forbidden", 403);
   const p = Patch.safeParse(await req.json().catch(() => null));
   if (!p.success) return fail("Invalid input");
-  const ok = await setOrderStatus(p.data.id, p.data.status);
-  return ok ? NextResponse.json({ ok: true }) : fail("Order not found", 404);
+  const r = await setOrderStatus(p.data.id, p.data.status);
+  if (r === "not_found") return fail("Order not found", 404);
+  if (r === "reopen_blocked") return fail("This cancelled order already returned the customer's ₹1 offer, so it cannot be reopened. Ask the customer to place a new order.", 409);
+  return NextResponse.json({ ok: true });
 }

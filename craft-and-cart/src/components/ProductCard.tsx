@@ -8,7 +8,7 @@ import { formatINR } from "@/lib/money";
 import ProductArt from "./ProductArt";
 import type { Product } from "@/lib/db";
 
-export default function ProductCard({ p, index = 0 }: { p: Product; index?: number }) {
+export default function ProductCard({ p, index = 0, promo = false }: { p: Product; index?: number; promo?: boolean }) {
   const card = useRef<HTMLDivElement>(null);
   const add = useCart((s) => s.add);
 
@@ -48,6 +48,7 @@ export default function ProductCard({ p, index = 0 }: { p: Product; index?: numb
           >
             <ProductArt p={p} sizes="(min-width:1024px) 360px, (min-width:640px) 45vw, 46vw" />
             {p.stock <= 5 && p.stock > 0 && <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white backdrop-blur sm:left-3 sm:top-3 sm:px-3">Only {p.stock} left</span>}
+            {promo && p.stock > 0 && <span className="absolute right-2 top-2 z-10 rounded-full bg-gradient-to-r from-pink to-violet px-2.5 py-1 text-xs font-bold text-white shadow sm:right-3 sm:top-3 sm:px-3">First order ₹1</span>}
             {p.stock === 0 && <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2.5 py-1 text-xs text-white sm:left-3 sm:top-3 sm:px-3">Sold out</span>}
           </div>
           <div className="px-1 pb-1 pt-3 sm:px-2 sm:pt-4">

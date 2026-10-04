@@ -52,6 +52,7 @@ wrapped in a South Indian (Pongal) design with smooth animations. Customers can 
 **Accounts and admin**
 - Customer sign-up (name, email, phone, password), sign-in, sign-out and forgot/reset password (passwords hashed with bcrypt, session in an httpOnly cookie).
 - `/account`: My orders (with order and payment status), order details, profile, saved addresses and password change. A customer can only ever see their own data.
+- **₹1 First Order Product offer:** one selected product (default: Strawberry Crochet Keychain) costs ₹1 for ONE unit in a signed-in customer's first order, paid online. Priced only on the server; once per customer account and phone number; a failed payment confirmed by Razorpay uses the offer up; a cancelled order restores it. The Super Admin chooses the product at `/admin/offer`.
 - Super Admin panel (`/admin/login`): dashboard, searchable orders with status updates, customers and their order history, and a payments ledger with Razorpay IDs. Role-checked on the server for every page and API call.
 - Newsletter sign-up and custom-order requests are saved in the database.
 
@@ -155,6 +156,7 @@ Run these inside `craft-and-cart/`.
 | `npm run db:start` | Start the built-in local PostgreSQL (port 54329, data in `.pgdata/`). |
 | `npm run db:seed` | Create tables and sample data for local development (reads `.env.local`). |
 | `npm run db:setup` | Same, for a hosted database (reads settings from the environment). Safe to repeat; upgrades older databases in place. |
+| `npm run catalog:add` | Add the second batch of 15 products (insert-only: never changes or deletes existing products). |
 | `npm run admin:create` | Create the first Super Admin, promote an existing account, or reset a Super Admin password (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). |
 
 ## How payments work
@@ -180,7 +182,7 @@ simulated payment anywhere, locally or live.
 ## Database
 
 Tables are defined in [`db/schema.sql`](craft-and-cart/db/schema.sql): `users` (role `CUSTOMER` or `SUPER_ADMIN`), `addresses`, `categories`, `products`, `orders`,
-`order_items`, `payments`, `password_resets`, `reviews`, `custom_requests` and `newsletter`. Prices are stored in paise (integers), orders keep a copy of
+`order_items`, `payments`, `password_resets`, `first_order_offer`, `offer_claims`, `offer_events`, `reviews`, `custom_requests` and `newsletter`. Prices are stored in paise (integers), orders keep a copy of
 each item's name and price, and the schema is safe to run repeatedly.
 
 The seed script ([`scripts/seed.ts`](craft-and-cart/scripts/seed.ts)) defines the catalogue. To change products, edit it and
@@ -196,7 +198,7 @@ run the seed command again. On an online database it never resets your stock num
 | `/login`, `/forgot-password`, `/reset-password` | Sign up / sign in, password reset |
 | `/account`, `/account/orders/[id]`, `/account/profile`, `/account/addresses` | Customer area (own data only) |
 | `/admin/login` | Super Admin sign-in |
-| `/admin/dashboard`, `/admin/orders`, `/admin/customers`, `/admin/payments` | Super Admin panel (SUPER_ADMIN role only) |
+| `/admin/dashboard`, `/admin/orders`, `/admin/customers`, `/admin/payments`, `/admin/products`, `/admin/offer` | Super Admin panel (SUPER_ADMIN role only): orders, customers, payments, product management (price, stock, photo, active), the ₹1 offer |
 
 | API route | Purpose |
 |---|---|

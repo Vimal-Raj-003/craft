@@ -110,6 +110,16 @@ https://craft.jilljill.in in a browser, creating a customer account, placing a t
 
 **Never** run `craft down -v` unless you want to delete the database volume.
 
+## Adding the 15 new products and the ₹1 offer (update)
+
+After `git pull`, `craft build` and the schema upgrade (`docker exec -i craft-db psql ... < db/schema.sql`, the same safe single-transaction command as before) and `craft up -d --no-deps craft-web`:
+
+```bash
+craft run --rm craft-web node scripts/add-catalog.cjs
+```
+
+It only **inserts** missing products (existing products, prices, stock and photos are never changed), adds the "Home" category, and, only if no offer has ever been configured, makes the Strawberry Crochet Keychain the ₹1 first-order product. Products whose photo is missing are added inactive. Photos and prices can then be changed in the Super Admin panel (Products), and the ₹1 product under "₹1 Offer". Photo credits: `public/products/CREDITS.md`.
+
 ## Turning on Razorpay (online payments)
 
 Until the keys are set, "Pay online" shows a friendly message and Cash on Delivery keeps working.

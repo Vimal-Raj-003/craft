@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { shippingFor } from "@/lib/money";
 import { fail, PHONE_RE, sameOrigin } from "@/lib/http";
 import { confirmCodOrder } from "@/lib/orders";
+import { computeQuote, holdOffer, restoreOfferForOrder } from "@/lib/offer";
 import { createRazorpayOrder, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
 
 const Body = z.object({
@@ -56,63 +56,63 @@ export async function POST(req: Request) {
     return fail("Online payment isn't available right now. Please choose Cash on Delivery.", 503);
   }
 
-  // Prices & stock always come from the DB, never from the client.
-  const ids = [...new Set(b.items.map((i) => i.productId))];
-  const { rows: products } = await pool.query("SELECT id,name,price_paise,stock FROM products WHERE id = ANY($1) AND active", [ids]);
-  const byId = new Map(products.map((p) => [p.id as number, p]));
-  const wanted = new Map<number, number>();
-  for (const it of b.items) wanted.set(it.productId, (wanted.get(it.productId) ?? 0) + it.qty);
-  let subtotal = 0;
-  for (const it of b.items) {
-    const p = byId.get(it.productId);
-    if (!p) return fail("A product in your cart is no longer available");
-    if (p.stock < (wanted.get(it.productId) ?? it.qty)) return fail(`Only ${p.stock} left of ${p.name}`, 409);
-    subtotal += p.price_paise * it.qty;
-  }
-  const shipping = shippingFor(subtotal);
-  const total = subtotal + shipping;
-
-  // Duplicate protection: the same signed-in customer sending the same cart, address and payment method again
-  // (double click, refresh, retry after closing the Razorpay window) gets the SAME order back, not a second one.
-  const fingerprint = crypto
-    .createHash("sha256")
-    .update(JSON.stringify([b.paymentMethod, total, b.address, [...b.items].sort((x, y) => x.productId - y.productId || (x.color ?? "").localeCompare(y.color ?? ""))]))
-    .digest("hex");
-  const window = b.paymentMethod === "cod" ? 60 : 1800;
-  const { rows: dup } = await pool.query(
-    `SELECT o.id, p.status AS pay_status, p.razorpay_order_id
-       FROM orders o JOIN payments p ON p.order_id=o.id
-      WHERE o.user_id=$1 AND o.idempotency_key=$2 AND o.status <> 'cancelled' AND o.created_at > now() - ($3 * interval '1 second')
-      ORDER BY o.created_at DESC LIMIT 1`,
-    [session.id, fingerprint, window],
-  );
-  if (dup[0]) {
-    if (b.paymentMethod === "cod") return NextResponse.json({ orderId: dup[0].id, method: "cod" });
-    if (dup[0].pay_status === "paid") return NextResponse.json({ orderId: dup[0].id, method: "online", alreadyPaid: true });
-    if (dup[0].razorpay_order_id) return NextResponse.json(razorpayParams(dup[0].id, dup[0].razorpay_order_id, total, customer));
-  }
-
   const client = await pool.connect();
   let orderId: string;
+  let total: number;
   try {
     await client.query("BEGIN");
+    // Serialise this customer's checkouts so the first-order offer can never be claimed twice at once.
+    await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [session.id]);
+
+    // Prices, stock and the first-order offer are ALL decided here, on the server.
+    const q = await computeQuote(client, { userId: session.id, method: b.paymentMethod, items: b.items, phone: b.phone });
+    if (!q.ok) {
+      await client.query("ROLLBACK");
+      return fail(q.error, q.status);
+    }
+    total = q.total;
+
+    // Duplicate protection: the same signed-in customer sending the same cart, address and payment method again
+    // (double click, refresh, retry after closing the Razorpay window) gets the SAME order back, not a second one.
+    const fingerprint = crypto
+      .createHash("sha256")
+      .update(JSON.stringify([b.paymentMethod, q.total, q.discount, b.address, [...b.items].sort((x, y) => x.productId - y.productId || (x.color ?? "").localeCompare(y.color ?? ""))]))
+      .digest("hex");
+    const window = b.paymentMethod === "cod" ? 60 : 1800;
+    const { rows: dup } = await client.query(
+      `SELECT o.id, p.status AS pay_status, p.razorpay_order_id
+         FROM orders o JOIN payments p ON p.order_id=o.id
+        WHERE o.user_id=$1 AND o.idempotency_key=$2 AND o.status <> 'cancelled' AND o.created_at > now() - ($3 * interval '1 second')
+        ORDER BY o.created_at DESC LIMIT 1`,
+      [session.id, fingerprint, window],
+    );
+    if (dup[0]) {
+      await client.query("COMMIT");
+      if (b.paymentMethod === "cod") return NextResponse.json({ orderId: dup[0].id, method: "cod" });
+      if (dup[0].pay_status === "paid") return NextResponse.json({ orderId: dup[0].id, method: "online", alreadyPaid: true });
+      if (dup[0].razorpay_order_id) return NextResponse.json(razorpayParams(dup[0].id, dup[0].razorpay_order_id, q.total, customer));
+      // (an old order that never got a Razorpay id: fall through and create a fresh one)
+      await client.query("BEGIN");
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [session.id]);
+    }
+
     const o = await client.query(
-      `INSERT INTO orders(user_id,email,name,phone,address,subtotal_paise,shipping_paise,total_paise,payment_method,idempotency_key)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-      [session.id, session.email, b.name, b.phone, b.address, subtotal, shipping, total, b.paymentMethod, fingerprint],
+      `INSERT INTO orders(user_id,email,name,phone,address,subtotal_paise,shipping_paise,total_paise,payment_method,idempotency_key,discount_paise,promo_product_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+      [session.id, session.email, b.name, b.phone, b.address, q.subtotal, q.shipping, q.total, b.paymentMethod, fingerprint, q.discount, q.promo?.productId ?? null],
     );
     orderId = o.rows[0].id;
-    for (const it of b.items) {
-      const p = byId.get(it.productId)!;
+    for (const l of q.lines) {
       await client.query(
-        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise) VALUES($1,$2,$3,$4,$5,$6)",
-        [orderId, p.id, p.name, it.color ?? null, it.qty, p.price_paise],
+        "INSERT INTO order_items(order_id,product_id,name,color,qty,price_paise,promo) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [orderId, l.productId, l.name, l.color, l.qty, l.unitPaise, l.promo],
       );
     }
     await client.query(
       "INSERT INTO payments(order_id,user_id,provider,status,amount_paise) VALUES($1,$2,$3,'pending',$4)",
-      [orderId, session.id, b.paymentMethod === "cod" ? "cod" : "razorpay", total],
+      [orderId, session.id, b.paymentMethod === "cod" ? "cod" : "razorpay", q.total],
     );
+    if (q.promo) await holdOffer(client, session.id, orderId, b.phone);
     if (b.saveAddress) {
       const exists = await client.query("SELECT count(*)::int AS n FROM addresses WHERE user_id=$1", [session.id]);
       await client.query(
@@ -122,7 +122,10 @@ export async function POST(req: Request) {
     }
     await client.query("COMMIT");
   } catch (e) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
+    if ((e as { code?: string }).code === "23505" && String((e as { constraint?: string }).constraint).includes("offer_claims")) {
+      return fail("The ₹1 offer is no longer available for this phone number. Please review your cart and try again.", 409);
+    }
     console.error(e);
     return fail("Could not create order", 500);
   } finally {
@@ -142,6 +145,7 @@ export async function POST(req: Request) {
     console.error("Razorpay order failed", e);
     await pool.query("UPDATE orders SET status='cancelled' WHERE id=$1", [orderId]);
     await pool.query("UPDATE payments SET status='failed', failure_reason='Could not reach Razorpay', updated_at=now() WHERE order_id=$1", [orderId]);
+    await restoreOfferForOrder(pool, orderId); // the order is cancelled before any payment attempt: the offer goes back
     return fail("Payment gateway unavailable. Please try again or choose Cash on Delivery.", 502);
   }
 }

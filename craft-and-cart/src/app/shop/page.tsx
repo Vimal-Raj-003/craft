@@ -1,6 +1,8 @@
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { listProducts, listCategories } from "@/lib/db";
+import { getActiveOffer } from "@/lib/offer";
+import OfferBanner from "@/components/OfferBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +11,7 @@ export default async function Shop({ searchParams }: PageProps<"/shop">) {
   const category = typeof sp.category === "string" ? sp.category : undefined;
   const sort = typeof sp.sort === "string" ? sp.sort : undefined;
   const q = typeof sp.q === "string" ? sp.q : undefined;
-  const [products, categories] = await Promise.all([listProducts({ category, sort, q }), listCategories()]);
+  const [products, categories, offer] = await Promise.all([listProducts({ category, sort, q }), listCategories(), getActiveOffer()]);
 
   const href = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -24,6 +26,8 @@ export default async function Shop({ searchParams }: PageProps<"/shop">) {
     <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-32 sm:px-6 sm:pt-36">
       <div className="aurora" style={{ opacity: 0.5 }}><i /><i /><i /></div>
       <h1 className="text-[2.6rem] font-bold min-[400px]:text-5xl sm:text-7xl">The <span className="font-serif font-normal italic text-gradient">shop</span></h1>
+
+      <div className="mt-8"><OfferBanner variant="compact" /></div>
 
       <div className="mt-10 flex flex-wrap items-center gap-3">
         <Link href={href({ category: undefined })} className={chip(!category)}>All</Link>
@@ -44,7 +48,7 @@ export default async function Shop({ searchParams }: PageProps<"/shop">) {
         <p className="mt-24 text-center text-dim">Nothing matched. Try another search 🧶</p>
       ) : (
         <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-6 lg:grid-cols-3">
-          {products.map((p, i) => <ProductCard key={p.id} p={p} index={i} />)}
+          {products.map((p, i) => <ProductCard key={p.id} p={p} index={i} promo={p.id === offer?.productId} />)}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
+import { addCatalog } from "./catalog";
 
 const url = process.env.DATABASE_URL ?? "postgres://craftcart:craftcart_local@localhost:54329/craftcart";
 // Anything that is not this PC is treated as a live database: stricter rules, no demo data.
@@ -43,13 +44,10 @@ async function main() {
   const pool = new Pool({ connectionString: url, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined });
   await pool.query(fs.readFileSync(path.resolve("db/schema.sql"), "utf8"));
 
-  // Drop the previous catalogue (order history keeps its line items; product_id becomes NULL).
-  await pool.query("DELETE FROM products WHERE slug <> ALL($1)", [products.map((p) => p[0])]);
-
   for (const [slug, name, blurb] of categories) {
     await pool.query(
       `INSERT INTO categories(slug,name,blurb) VALUES($1,$2,$3)
-       ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, blurb=EXCLUDED.blurb`,
+       ${isRemote ? "ON CONFLICT (slug) DO NOTHING" : "ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, blurb=EXCLUDED.blurb"}`,
       [slug, name, blurb],
     );
   }
@@ -57,19 +55,24 @@ async function main() {
     await pool.query(
       `INSERT INTO products(slug,name,tagline,description,price_paise,category_id,stock,colors,hue_a,hue_b,emoji,featured,image_url)
        VALUES($1,$2,$3,$4,$5,(SELECT id FROM categories WHERE slug=$6),$7,$8,$9,$10,$11,$12,$13)
-       ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, tagline=EXCLUDED.tagline, description=EXCLUDED.description,
-         price_paise=EXCLUDED.price_paise,${isRemote ? "" : " stock=EXCLUDED.stock,"} colors=EXCLUDED.colors, featured=EXCLUDED.featured,
-         category_id=EXCLUDED.category_id, hue_a=EXCLUDED.hue_a, hue_b=EXCLUDED.hue_b, emoji=EXCLUDED.emoji, image_url=EXCLUDED.image_url`,
+       ${isRemote
+         // a live database is never overwritten: products the owner edited in the admin panel stay exactly as they are
+         ? "ON CONFLICT (slug) DO NOTHING"
+         : `ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, tagline=EXCLUDED.tagline, description=EXCLUDED.description,
+         price_paise=EXCLUDED.price_paise, stock=EXCLUDED.stock, colors=EXCLUDED.colors, featured=EXCLUDED.featured,
+         category_id=EXCLUDED.category_id, hue_a=EXCLUDED.hue_a, hue_b=EXCLUDED.hue_b, emoji=EXCLUDED.emoji, image_url=EXCLUDED.image_url`}`,
       [slug, name, tagline, description, price, cat, stock, colors, a, b, emoji, featured, image ?? null],
     );
   }
+
+  await pool.query("UPDATE products SET sku = 'CC-' || lpad(id::text, 4, '0') WHERE sku IS NULL");
+  const added = await addCatalog(pool); // the second batch of 15 products (insert-only)
 
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@craftandcart.local";
   const adminPass = process.env.ADMIN_PASSWORD ?? (isRemote ? "" : "admin12345");
   if (isRemote && adminPass.length < 10) {
     throw new Error("Seeding a live database: set ADMIN_PASSWORD (at least 10 characters) so the admin account is not left with a guessable password.");
   }
-  await pool.query("DELETE FROM categories WHERE slug <> ALL($1)", [categories.map((c) => c[0])]);
 
   await pool.query(
     `INSERT INTO users(email,name,password_hash,role) VALUES($1,'Admin',$2,'SUPER_ADMIN')
@@ -89,7 +92,7 @@ async function main() {
     await pool.query("INSERT INTO reviews(product_id,author,rating,body) VALUES($1,$2,$3,$4)", [r.id, ...rv]);
   }
 
-  console.log(`🌱 Seeded ${products.length} products. Admin: ${adminEmail}${isRemote ? "" : " / " + adminPass}`);
+  console.log(`🌱 Seeded ${products.length} products (+${added} from the second catalogue). Admin: ${adminEmail}${isRemote ? "" : " / " + adminPass}`);
   await pool.end();
 }
 

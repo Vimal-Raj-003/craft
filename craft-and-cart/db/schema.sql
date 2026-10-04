@@ -170,3 +170,59 @@ CREATE TABLE IF NOT EXISTS password_resets (
   used_at    TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Product management + "First order Rs 1 product" offer (additive; nothing is deleted or rewritten).
+-- ---------------------------------------------------------------------------
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_data BYTEA;          -- photo uploaded by the Super Admin (resized, webp)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_type TEXT;
+UPDATE products SET sku = 'CC-' || lpad(id::text, 4, '0') WHERE sku IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS products_sku_key ON products(sku);
+
+-- Which ONE product is the Rs 1 first-order product. At most one row can be active.
+CREATE TABLE IF NOT EXISTS first_order_offer (
+  id                SERIAL PRIMARY KEY,
+  product_id        INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  offer_price_paise INTEGER NOT NULL DEFAULT 100 CHECK (offer_price_paise >= 100),
+  active            BOOLEAN NOT NULL DEFAULT true,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS first_order_offer_one_active ON first_order_offer ((true)) WHERE active;
+
+-- One row per customer who has taken part in the offer.
+--   held     = an online order with the offer price exists and is waiting for payment
+--   used     = that order was paid (verified by the server)
+--   failed   = Razorpay reported a genuine failed payment attempt (offer is spent)
+--   restored = the order was cancelled, so the customer can use the offer again
+CREATE TABLE IF NOT EXISTS offer_claims (
+  user_id    UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  status     TEXT NOT NULL CHECK (status IN ('held','used','failed','restored')),
+  order_id   UUID REFERENCES orders(id) ON DELETE SET NULL,
+  phone_key  TEXT,                                   -- last 10 digits of the delivery phone: one active claim per phone
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS offer_claims_phone_active ON offer_claims (phone_key)
+  WHERE phone_key IS NOT NULL AND status IN ('held','used','failed');
+
+-- Audit trail (shown to the Super Admin; also proves an offer was restored only once).
+CREATE TABLE IF NOT EXISTS offer_events (
+  id         SERIAL PRIMARY KEY,
+  user_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+  order_id   UUID REFERENCES orders(id) ON DELETE SET NULL,
+  event      TEXT NOT NULL,
+  detail     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS offer_events_order_idx ON offer_events(order_id);
+
+-- What the offer did to an order: orders.subtotal_paise stays the normal-price subtotal,
+-- total_paise = subtotal - discount + shipping.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_paise INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS offer_status TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS promo BOOLEAN NOT NULL DEFAULT false;
+
+INSERT INTO categories(slug, name, blurb) VALUES ('home', 'Home', 'Cosy crochet for your home.') ON CONFLICT (slug) DO NOTHING;

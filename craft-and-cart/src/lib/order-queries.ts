@@ -12,6 +12,9 @@ export type OrderDetail = {
   subtotal_paise: number;
   shipping_paise: number;
   total_paise: number;
+  discount_paise: number;
+  offer_status: string | null;
+  promo_product_id: number | null;
   status: string;
   payment_method: "online" | "cod";
   created_at: Date;
@@ -20,7 +23,7 @@ export type OrderDetail = {
   razorpay_payment_id: string | null;
   paid_at: Date | null;
   failure_reason: string | null;
-  items: { name: string; color: string | null; qty: number; price_paise: number }[];
+  items: { name: string; color: string | null; qty: number; price_paise: number; promo: boolean }[];
 };
 
 /**
@@ -30,7 +33,7 @@ export type OrderDetail = {
 export async function getOrderDetail(id: string, ownerId?: string): Promise<OrderDetail | null> {
   if (!isUuid(id)) return null;
   const { rows } = await pool.query(
-    `SELECT o.id,o.user_id,o.name,o.email,o.phone,o.address,o.subtotal_paise,o.shipping_paise,o.total_paise,o.status,o.payment_method,o.created_at,
+    `SELECT o.id,o.user_id,o.name,o.email,o.phone,o.address,o.subtotal_paise,o.shipping_paise,o.total_paise,o.discount_paise,o.offer_status,o.promo_product_id,o.status,o.payment_method,o.created_at,
             pay.status AS payment_status, pay.razorpay_order_id, pay.razorpay_payment_id, pay.paid_at, pay.failure_reason
        FROM orders o LEFT JOIN payments pay ON pay.order_id=o.id
       WHERE o.id=$1 AND ($2::uuid IS NULL OR o.user_id=$2::uuid)`,
@@ -38,7 +41,7 @@ export async function getOrderDetail(id: string, ownerId?: string): Promise<Orde
   );
   if (!rows[0]) return null;
   const { rows: items } = await pool.query(
-    "SELECT name,color,qty,price_paise FROM order_items WHERE order_id=$1 ORDER BY id",
+    "SELECT name,color,qty,price_paise,promo FROM order_items WHERE order_id=$1 ORDER BY id",
     [id],
   );
   return { ...rows[0], items };
