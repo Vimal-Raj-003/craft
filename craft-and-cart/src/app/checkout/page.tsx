@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, cartSubtotal } from "@/lib/cart";
 import { formatINR, shippingFor } from "@/lib/money";
+import { useMounted } from "@/lib/use-mounted";
 
 type Method = "online" | "cod";
 type Addr = { id: string; label: string; name: string; phone: string; line1: string; city: string; state: string; pincode: string; is_default: boolean };
@@ -32,7 +33,7 @@ function loadRazorpay() {
 export default function Checkout() {
   const router = useRouter();
   const { lines, clear } = useCart();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -44,8 +45,7 @@ export default function Checkout() {
   const fillFrom = (a: Addr) => setF({ name: a.name, phone: a.phone, line1: a.line1, city: a.city, state: a.state, pincode: a.pincode });
 
   useEffect(() => {
-    setMounted(true);
-    fetch("/api/auth/me").then((r) => r.json()).then(({ user }) => {
+   fetch("/api/auth/me").then((r) => r.json()).then(({ user }) => {
       setSignedIn(Boolean(user));
       if (user) setF((x) => ({ ...x, name: user.name }));
     }).catch(() => setSignedIn(false));

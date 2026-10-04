@@ -18,7 +18,7 @@ FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Public address baked into the build (used for PhonePe return links). Overridable with --build-arg.
+# Public address baked into the build (used in password-reset email links). Overridable with --build-arg.
 ARG NEXT_PUBLIC_SITE_URL=https://craft.jilljill.in
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
     NEXT_TELEMETRY_DISABLED=1

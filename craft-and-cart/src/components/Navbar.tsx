@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCart, cartCount } from "@/lib/cart";
+import { useMounted } from "@/lib/use-mounted";
 
 type User = { name: string; role: string } | null;
 
@@ -17,7 +18,7 @@ export default function Navbar() {
   const lines = useCart((s) => s.lines);
   const setOpen = useCart((s) => s.setOpen);
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [user, setUser] = useState<User>(null);
   const [scrolled, setScrolled] = useState(false);
   // the phone menu is "open for this page": navigating to another page closes it automatically
@@ -25,7 +26,6 @@ export default function Navbar() {
   const menu = menuAt === pathname;
 
   useEffect(() => {
-    setMounted(true);
     fetch("/api/auth/me").then((r) => r.json()).then((d) => setUser(d.user)).catch(() => {});
     const on = () => setScrolled(window.scrollY > 24);
     on();

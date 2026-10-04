@@ -1,15 +1,14 @@
 "use client";
+import { useMounted } from "@/lib/use-mounted";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
 import { useCart, cartSubtotal } from "@/lib/cart";
 import { formatINR, shippingFor, FREE_SHIPPING_OVER } from "@/lib/money";
 
 export default function CartDrawer() {
   const { lines, open, setOpen, setQty, remove } = useCart();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const subtotal = mounted ? cartSubtotal(lines) : 0;
+  const mounted = useMounted();
+ const subtotal = mounted ? cartSubtotal(lines) : 0;
   const progress = Math.min(subtotal / FREE_SHIPPING_OVER, 1);
 
   return (
