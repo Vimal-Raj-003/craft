@@ -6,7 +6,7 @@ import { getSession } from "@/lib/auth";
 import { fail, PHONE_RE, sameOrigin } from "@/lib/http";
 import { confirmCodOrder } from "@/lib/orders";
 import { computeQuote, holdOffer, restoreOfferForOrder } from "@/lib/offer";
-import { createRazorpayOrder, explainRazorpayError, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
+import { createRazorpayOrder, explainRazorpayError, RazorpayError, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
 import { logPay } from "@/lib/pay-log";
 
 const Body = z.object({
@@ -143,10 +143,10 @@ export async function POST(req: Request) {
     await pool.query("UPDATE payments SET razorpay_order_id=$2, updated_at=now() WHERE order_id=$1", [orderId, rz.id]);
     // Razorpay must have created the order for exactly the amount we computed
     if (rz.amount !== total || rz.currency !== "INR") {
-      await logPay({ orderId, stage: "order_create", ok: false, code: "AMOUNT_MISMATCH", message: `Razorpay order amount ${rz.amount} ${rz.currency} differs from ${total} INR`, amountPaise: total, razorpayOrderId: rz.id });
-    } else {
-      await logPay({ orderId, stage: "order_create", ok: true, amountPaise: total, razorpayOrderId: rz.id });
+      // Never open Checkout for an order whose amount differs from what we computed.
+      throw new RazorpayError("/orders", null, "AMOUNT_MISMATCH", `Razorpay order amount ${rz.amount} ${rz.currency} differs from ${total} INR`);
     }
+    await logPay({ orderId, stage: "order_create", ok: true, amountPaise: total, razorpayOrderId: rz.id });
     return NextResponse.json(razorpayParams(orderId, rz.id, total, customer));
   } catch (e) {
     const x = explainRazorpayError(e);

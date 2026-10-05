@@ -34,6 +34,7 @@ export function explainRazorpayError(e: unknown): { code: string; message: strin
       };
     }
     if (e.code === "AMOUNT_INVALID") return { code: e.code, message: e.description, hint: "The amount sent to Razorpay must be a whole number of paise, at least 100 (₹1)." };
+    if (e.code === "AMOUNT_MISMATCH") return { code: e.code, message: e.description, hint: "Razorpay created the order for a different amount than the server computed, so checkout was not opened." };
     if (e.status === null) return { code: "GATEWAY_UNREACHABLE", message: e.description, hint: "The server could not reach api.razorpay.com (network, DNS, firewall or timeout)." };
     if (e.status >= 500) return { code: "GATEWAY_ERROR", message: `Razorpay had a server error (HTTP ${e.status}).`, hint: "Usually temporary. Retry in a few minutes." };
     return { code: e.code || "BAD_REQUEST", message: e.description, hint: "Razorpay refused the request; the message above is Razorpay's own reason (for example an account that is not activated for live payments)." };
