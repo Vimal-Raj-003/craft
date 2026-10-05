@@ -22,7 +22,7 @@ type RazorpayOptions = {
 
 declare global {
   interface Window {
-    Razorpay?: new (o: Record<string, unknown>) => { open(): void; on(ev: string, cb: (r: { error?: { description?: string } }) => void): void };
+    Razorpay?: new (o: Record<string, unknown>) => { open(): void; on(ev: string, cb: (r: { error?: { description?: string; code?: string; reason?: string; step?: string; source?: string; metadata?: { payment_id?: string } } }) => void): void };
   }
 }
 
@@ -114,11 +114,13 @@ export default function Checkout() {
       },
     });
     rzp.on("payment.failed", (r) => {
-      report({ event: "failed", orderId, reason: r.error?.description ?? "Payment failed" });
+      // Razorpay's own failure details (no card data is ever in here) so the exact reason is recorded
+      report({ event: "failed", orderId, reason: r.error?.description ?? r.error?.reason ?? "Payment failed", code: r.error?.code, step: r.error?.step, source: r.error?.source, paymentId: r.error?.metadata?.payment_id });
       setErr(r.error?.description ?? "Payment failed. Please try again or use another method.");
       setBusy(false);
     });
     rzp.open();
+    report({ event: "opened", orderId });
   }
 
   async function placeOrder(e: React.FormEvent) {

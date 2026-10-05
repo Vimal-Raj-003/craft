@@ -6,7 +6,8 @@ import { getSession } from "@/lib/auth";
 import { fail, PHONE_RE, sameOrigin } from "@/lib/http";
 import { confirmCodOrder } from "@/lib/orders";
 import { computeQuote, holdOffer, restoreOfferForOrder } from "@/lib/offer";
-import { createRazorpayOrder, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
+import { createRazorpayOrder, explainRazorpayError, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
+import { logPay } from "@/lib/pay-log";
 
 const Body = z.object({
   paymentMethod: z.enum(["online", "cod"]),
@@ -140,12 +141,21 @@ export async function POST(req: Request) {
   try {
     const rz = await createRazorpayOrder(total, orderId);
     await pool.query("UPDATE payments SET razorpay_order_id=$2, updated_at=now() WHERE order_id=$1", [orderId, rz.id]);
+    // Razorpay must have created the order for exactly the amount we computed
+    if (rz.amount !== total || rz.currency !== "INR") {
+      await logPay({ orderId, stage: "order_create", ok: false, code: "AMOUNT_MISMATCH", message: `Razorpay order amount ${rz.amount} ${rz.currency} differs from ${total} INR`, amountPaise: total, razorpayOrderId: rz.id });
+    } else {
+      await logPay({ orderId, stage: "order_create", ok: true, amountPaise: total, razorpayOrderId: rz.id });
+    }
     return NextResponse.json(razorpayParams(orderId, rz.id, total, customer));
   } catch (e) {
-    console.error("Razorpay order failed", e);
+    const x = explainRazorpayError(e);
+    if (x.code === "UNKNOWN") console.error("checkout: unexpected error after order insert:", (e as Error)?.message);
+    await logPay({ orderId, stage: "order_create", ok: false, code: x.code, message: x.message, amountPaise: total });
     await pool.query("UPDATE orders SET status='cancelled' WHERE id=$1", [orderId]);
-    await pool.query("UPDATE payments SET status='failed', failure_reason='Could not reach Razorpay', updated_at=now() WHERE order_id=$1", [orderId]);
+    await pool.query("UPDATE payments SET status='failed', failure_reason=$2, updated_at=now() WHERE order_id=$1", [orderId, `${x.code}: ${x.message}`.slice(0, 300)]);
     await restoreOfferForOrder(pool, orderId); // the order is cancelled before any payment attempt: the offer goes back
-    return fail("Payment gateway unavailable. Please try again or choose Cash on Delivery.", 502);
+    // The customer gets a plain message; the exact reason is in Admin → Payments and the server log.
+    return fail(`Online payment is temporarily unavailable. Please choose Cash on Delivery or try again later. (Reference ${orderId.slice(0, 8)})`, 502);
   }
 }

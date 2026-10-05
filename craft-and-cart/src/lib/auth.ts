@@ -11,7 +11,7 @@ const secret = () => {
   return new TextEncoder().encode(s ?? "dev-secret-change-me");
 };
 
-export type Role = "CUSTOMER" | "SUPER_ADMIN";
+export type Role = "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
 export type SessionUser = { id: string; email: string; name: string; role: Role };
 
 export async function createSession(user: SessionUser) {
@@ -50,4 +50,10 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function getAdmin() {
   const s = await getSession();
   return s?.role === "SUPER_ADMIN" ? s : null;
+}
+
+/** ADMIN or SUPER_ADMIN (day-to-day shop management: orders, customers, payments, products). Checked from the database. */
+export async function getStaff() {
+  const s = await getSession();
+  return s?.role === "SUPER_ADMIN" || s?.role === "ADMIN" ? s : null;
 }

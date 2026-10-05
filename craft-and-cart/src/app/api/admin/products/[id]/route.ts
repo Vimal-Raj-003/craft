@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getAdmin } from "@/lib/auth";
+import { getAdmin, getStaff } from "@/lib/auth";
 import { fail, sameOrigin } from "@/lib/http";
 import { ProductFields } from "@/lib/admin-products";
 
-// Products are never deleted (orders keep referring to them); the Super Admin deactivates instead.
+// Staff can edit and deactivate products. Only the SUPER_ADMIN can delete one (past orders keep their item names and prices).
 export async function PATCH(req: Request, ctx: RouteContext<"/api/admin/products/[id]">) {
   if (!sameOrigin(req)) return fail("Forbidden", 403);
-  if (!(await getAdmin())) return fail("Forbidden", 403);
+  if (!(await getStaff())) return fail("Forbidden", 403);
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id) || id <= 0) return fail("Not found", 404);
 
@@ -41,4 +41,14 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/admin/products
     if ((e as { code?: string }).code === "23505") return fail("That SKU is already used by another product", 409);
     throw e;
   }
+}
+
+/** Permanently deletes a product. SUPER_ADMIN only. Order history is kept (order items keep their name and price). */
+export async function DELETE(req: Request, ctx: RouteContext<"/api/admin/products/[id]">) {
+  if (!sameOrigin(req)) return fail("Forbidden", 403);
+  if (!(await getAdmin())) return fail("Forbidden", 403);
+  const id = Number((await ctx.params).id);
+  if (!Number.isInteger(id) || id <= 0) return fail("Not found", 404);
+  const r = await pool.query("DELETE FROM products WHERE id=$1 RETURNING name", [id]);
+  return r.rowCount ? NextResponse.json({ ok: true, deleted: r.rows[0].name }) : fail("Not found", 404);
 }

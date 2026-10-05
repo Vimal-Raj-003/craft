@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ProfileForms(props: { name: string; email: string; phone: string; since: string }) {
   const router = useRouter();
@@ -45,8 +46,8 @@ export default function ProfileForms(props: { name: string; email: string; phone
 
       <form onSubmit={(e) => { e.preventDefault(); send("password"); }} className="glass h-fit space-y-4 rounded-3xl p-6">
         <h2 className="text-xl font-semibold">Change password</h2>
-        <input className="input" type="password" placeholder="Current password" autoComplete="current-password" required value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
-        <input className="input" type="password" placeholder="New password (min 8 characters)" autoComplete="new-password" required minLength={8} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+        <PasswordInput placeholder="Current password" autoComplete="current-password" required value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
+        <PasswordInput placeholder="New password (min 8 characters)" autoComplete="new-password" required minLength={8} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
         {note("password")}
         <button className="btn btn-ghost min-h-12 w-full" disabled={busy === "password"}>{busy === "password" ? "Changing…" : "Change password"}</button>
       </form>

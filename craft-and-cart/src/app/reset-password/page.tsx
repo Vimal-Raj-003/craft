@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -30,7 +31,7 @@ export default function ResetPassword() {
           </>
         ) : (
           <>
-            <input className="input" type="password" placeholder="New password (min 8 characters)" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput placeholder="New password (min 8 characters)" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
             {err && <p className="text-sm text-pink" role="alert">{err}</p>}
             <button className="btn btn-primary min-h-12 w-full" disabled={busy}>{busy ? "…" : "Change password"}</button>
             <Link href="/forgot-password" className="block py-1 text-center text-sm text-dim hover:text-ink">Need a new link?</Link>

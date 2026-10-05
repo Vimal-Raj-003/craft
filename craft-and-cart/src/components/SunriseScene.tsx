@@ -18,27 +18,63 @@ function Palm({ x, h }: { x: number; h: number }) {
   );
 }
 
+/** A tapered blade (lens shape) with a lighter mid-rib, used for sugarcane leaves. */
+function Blade({ x, y, dx, len, w }: { x: number; y: number; dx: number; len: number; w: number }) {
+  const tx = x + dx;
+  const ty = y + len * 0.3;
+  const mx = x + dx * 0.5;
+  return (
+    <g>
+      <path d={`M${x} ${y} Q ${mx - w} ${y - len * 0.6} ${tx} ${ty} Q ${mx + w} ${y - len * 0.3} ${x} ${y} Z`} fill="url(#leafG)" />
+      <path d={`M${x} ${y} Q ${mx} ${y - len * 0.45} ${tx} ${ty}`} stroke="#d4eba0" strokeWidth="1.3" fill="none" opacity=".65" />
+    </g>
+  );
+}
+
+/** Three green sugarcane stalks tied together with a red cloth: jointed, waxy-bloomed nodes, shaded like a cylinder, with arching leaves. */
 function Canes({ x, flip = false }: { x: number; flip?: boolean }) {
   const stalks = [{ x: 30, h: 360, d: 0 }, { x: 78, h: 410, d: -1.4 }, { x: 126, h: 330, d: -2.6 }];
   return (
     <svg x={x} y={70} width={110} height={270} viewBox="0 0 170 440" overflow="visible">
       <g transform={flip ? "translate(170 0) scale(-1 1)" : undefined}>
-        {stalks.map((s) => (
-          <g key={s.x} className="sway" style={{ animationDelay: `${s.d}s` }}>
-            <rect x={s.x - 9} y={440 - s.h} width="18" height={s.h} rx="6" fill="url(#cane)" />
-            {Array.from({ length: Math.floor(s.h / 46) }, (_, k) => (
-              <rect key={k} x={s.x - 10} y={440 - s.h + 18 + k * 46} width="20" height="5" rx="2.5" fill="#d9b25a" opacity=".9" />
-            ))}
-            <path d={`M${s.x} ${446 - s.h} C ${s.x - 40} ${420 - s.h}, ${s.x - 62} ${450 - s.h}, ${s.x - 70} ${500 - s.h}`} stroke="#2f9e44" strokeWidth="6" fill="none" strokeLinecap="round" />
-            <path d={`M${s.x} ${446 - s.h} C ${s.x + 40} ${416 - s.h}, ${s.x + 62} ${446 - s.h}, ${s.x + 68} ${494 - s.h}`} stroke="#1f7a3a" strokeWidth="6" fill="none" strokeLinecap="round" />
-            <path d={`M${s.x} ${444 - s.h} C ${s.x} ${410 - s.h}, ${s.x + 6} ${396 - s.h}, ${s.x + 2} ${382 - s.h}`} stroke="#2f9e44" strokeWidth="5" fill="none" strokeLinecap="round" />
-          </g>
-        ))}
+        {stalks.map((s) => {
+          const top = 440 - s.h;
+          const nodes = Array.from({ length: Math.floor(s.h / 52) }, (_, k) => top + 24 + k * 52 + (k % 2 ? 7 : -3) + ((k * 13) % 5));
+          return (
+            <g key={s.x} className="sway" style={{ animationDelay: `${s.d}s` }}>
+              <ellipse cx={s.x + 2} cy={440} rx="22" ry="5" fill="#2a1406" opacity=".35" />
+              {/* the cylinder, shaded from the sun on the left */}
+              <rect x={s.x - 13} y={top} width="26" height={s.h} rx="9" fill="url(#caneG)" />
+              {/* faint lengthwise fibres */}
+              {[-8, -4, 0, 4, 8].map((o, i) => <line key={i} x1={s.x + o} y1={top + 10} x2={s.x + o + (i - 2) * 0.6} y2="436" stroke={i % 2 ? "#1c3a12" : "#cfe59a"} strokeWidth=".9" opacity=".26" />)}
+              {nodes.map((ny, k) => (
+                <g key={k}>
+                  <ellipse cx={s.x} cy={ny + 5} rx="13.5" ry="3.4" fill="#1d3a12" opacity=".38" />
+                  <ellipse cx={s.x} cy={ny} rx="14.5" ry="5" fill="url(#caneNode)" />
+                  <ellipse cx={s.x} cy={ny - 5} rx="13.5" ry="3" fill="#f1f2dc" opacity=".55" />
+                  {k % 2 === 0 && <ellipse cx={s.x - 2} cy={ny + 1} rx="3" ry="1.2" fill="#5a3b1c" opacity=".55" />}
+                </g>
+              ))}
+              {/* top of the stalk: leaf sheath and arching blades */}
+              <path d={`M${s.x - 13} ${top + 9} Q ${s.x} ${top - 10} ${s.x + 13} ${top + 9} Z`} fill="#5f8f2e" />
+              <Blade x={s.x} y={top + 4} dx={-84} len={104} w={11} />
+              <Blade x={s.x} y={top + 4} dx={80} len={98} w={11} />
+              <Blade x={s.x} y={top + 2} dx={-30} len={78} w={7} />
+              <Blade x={s.x} y={top + 2} dx={34} len={84} w={7} />
+              <Blade x={s.x} y={top} dx={4} len={60} w={6} />
+            </g>
+          );
+        })}
+        {/* red cloth tying the bundle */}
+        <g>
+          <rect x="14" y="282" width="126" height="15" rx="5" fill="url(#cloth)" />
+          <path d="M20 289 H134" stroke="#ffd34d" strokeWidth="1.6" strokeDasharray="2 5" opacity=".85" />
+          <path d="M128 296 q8 14 3 28 M134 296 q10 10 8 24" stroke="#b5261b" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+        </g>
       </g>
     </svg>
   );
 }
-
 /** Flat kolam seen in perspective on the ground. */
 function GroundKolam({ cx, cy, s = 1 }: { cx: number; cy: number; s?: number }) {
   return (
@@ -53,37 +89,75 @@ function GroundKolam({ cx, cy, s = 1 }: { cx: number; cy: number; s?: number }) 
   );
 }
 
+/** A traditional clay Pongal pot: shaded terracotta with grain and soot, painted neck band, turmeric plant tied on, rice froth boiling over. */
 function Pot() {
   return (
     <g transform="translate(-60 -153) scale(.5)">
+      {/* soft steam */}
       {[70, 120, 170].map((x, i) => (
-        <path key={x} className="steam" style={{ animationDelay: `${i * 1.2}s` }} d={`M${x} 40 q-10 -14 0 -26 t0 -26`} stroke="#fff" strokeWidth="6" strokeLinecap="round" fill="none" opacity=".75" />
+        <path key={x} className="steam" style={{ animationDelay: `${i * 1.2}s` }} d={`M${x} 40 q-10 -14 0 -26 t0 -26`} stroke="#fff" strokeWidth="7" strokeLinecap="round" fill="none" opacity=".6" filter="url(#softBlur)" />
       ))}
-      <path d="M52 112 C 22 150 24 218 70 244 C 100 258 140 258 170 244 C 216 218 218 150 188 112 Z" fill="url(#clay)" />
-      <rect x="64" y="96" width="112" height="22" rx="11" fill="#b95a2a" />
-      <path d="M34 168 Q120 192 206 168" stroke="#fff4e0" strokeWidth="6" fill="none" strokeDasharray="1 12" strokeLinecap="round" />
-      <path d="M32 186 Q120 210 208 186" stroke="#ffd34d" strokeWidth="5" fill="none" />
-      <path d="M34 200 Q120 224 206 200" stroke="#e8334f" strokeWidth="5" fill="none" />
-      <path d="M120 112 C 70 96 54 60 66 28 C 92 46 112 76 120 112 Z" fill="#2f9e44" />
-      <path d="M120 112 C 170 96 186 60 174 28 C 148 46 128 76 120 112 Z" fill="#1f7a3a" />
-      <path d="M120 112 C 112 78 116 54 120 18 C 128 54 130 78 120 112 Z" fill="#3cb55a" />
-      <rect x="66" y="102" width="108" height="9" rx="4.5" fill="#e8334f" />
-      <g className="foam">
-        <ellipse cx="120" cy="92" rx="62" ry="22" fill="#fffdf5" />
-        {[[78, 84, 20], [104, 74, 24], [138, 76, 24], [164, 86, 19], [120, 66, 20]].map(([cx, cy, r], i) => (
-          <circle key={i} cx={cx} cy={cy} r={r} fill="#fffdf5" />
+
+      {/* turmeric plant (manjal kothu) tied around the neck */}
+      <g>
+        {[[-1, 46, 190], [-0.55, 22, 210], [0, 0, 226], [0.55, -22, 210], [1, -46, 190]].map(([k, o, len], i) => (
+          <g key={i}>
+            <path d={`M${120 + (o as number) * 0.6} 112 C ${120 + (k as number) * 34} ${112 - (len as number) * 0.5}, ${120 + (k as number) * 70} ${112 - (len as number) * 0.62}, ${120 + (k as number) * 84} ${112 - (len as number) * 0.28} C ${120 + (k as number) * 56} ${112 - (len as number) * 0.55}, ${120 + (k as number) * 22} ${112 - (len as number) * 0.4}, ${120 + (o as number) * 0.6 + 6} 112 Z`} fill="url(#leafG)" />
+            <path d={`M${120 + (o as number) * 0.6 + 3} 112 C ${120 + (k as number) * 30} ${112 - (len as number) * 0.4}, ${120 + (k as number) * 60} ${112 - (len as number) * 0.52}, ${120 + (k as number) * 84} ${112 - (len as number) * 0.28}`} stroke="#d9efa8" strokeWidth="1.6" fill="none" opacity=".6" />
+          </g>
         ))}
       </g>
-      {[[82, 0], [118, 1.1], [158, 2.1]].map(([x, d]) => (
-        <ellipse key={x} className="drip" style={{ animationDelay: `${d}s` }} cx={x} cy="108" rx="6" ry="10" fill="#fffdf5" />
+
+      {/* ground contact shadow */}
+      <ellipse cx="120" cy="262" rx="86" ry="9" fill="#2a1005" opacity=".35" />
+
+      {/* the pot body */}
+      <path d="M64 108 C 38 122 16 162 18 202 C 20 242 62 264 120 264 C 178 264 220 242 222 202 C 224 162 202 122 176 108 Z" fill="url(#clayBody)" filter="url(#clayGrain)" />
+      <path d="M64 108 C 38 122 16 162 18 202 C 20 242 62 264 120 264 C 178 264 220 242 222 202 C 224 162 202 122 176 108 Z" fill="url(#clayShade)" />
+      {/* soot from the fire */}
+      <ellipse cx="120" cy="268" rx="100" ry="52" fill="url(#soot)" clipPath="url(#potClip)" />
+      {/* sun-side highlight and rim light */}
+      <ellipse cx="62" cy="180" rx="11" ry="50" transform="rotate(10 62 180)" fill="#fff4d6" opacity=".26" filter="url(#softBlur)" />
+      <path d="M170 118 C 206 138 218 176 214 210" stroke="#ffb27a" strokeWidth="3" fill="none" opacity=".22" strokeLinecap="round" filter="url(#softBlur)" />
+
+      {/* rim */}
+      <ellipse cx="120" cy="108" rx="62" ry="17" fill="url(#clayRim)" />
+      <ellipse cx="120" cy="106" rx="50" ry="11" fill="#3a1305" />
+      <path d="M58 110 Q 120 130 182 110" stroke="#5a2209" strokeWidth="2" fill="none" opacity=".5" />
+
+      {/* painted neck band: white lime dashes, kumkum dots, turmeric line */}
+      <path d="M30 150 Q 120 178 210 150" stroke="#fff4e0" strokeWidth="7" fill="none" strokeDasharray="2.5 9" strokeLinecap="round" opacity=".92" />
+      <path d="M26 170 Q 120 200 214 170" stroke="#d62c1f" strokeWidth="6" fill="none" strokeDasharray="1 13" strokeLinecap="round" />
+      <path d="M24 186 Q 120 216 216 186" stroke="#f2b01e" strokeWidth="3.4" fill="none" opacity=".95" />
+      {/* red thread tying the leaves at the neck */}
+      <path d="M72 118 Q 120 134 168 118" stroke="#c4261b" strokeWidth="6.5" fill="none" strokeLinecap="round" />
+      <path d="M72 118 Q 120 134 168 118" stroke="#ff8a7a" strokeWidth="1.4" fill="none" strokeDasharray="3 5" opacity=".7" />
+
+      {/* rice froth boiling over */}
+      <g className="foam">
+        <ellipse cx="120" cy="100" rx="66" ry="22" fill="#d9ccaa" opacity=".55" />
+        <ellipse cx="120" cy="94" rx="64" ry="21" fill="url(#foamG)" />
+        {[[78, 86, 21], [104, 75, 25], [140, 76, 25], [166, 87, 20], [120, 64, 21], [92, 62, 14], [152, 62, 14]].map(([cx, cy, r], i) => (
+          <g key={i}>
+            <circle cx={cx} cy={cy} r={r} fill="url(#foamG)" />
+            <circle cx={(cx as number) - (r as number) * 0.32} cy={(cy as number) - (r as number) * 0.36} r={(r as number) * 0.26} fill="#fff" opacity=".85" />
+          </g>
+        ))}
+        {[[96, 70], [126, 82], [150, 70], [110, 58], [138, 60], [82, 90], [160, 92]].map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="1.6" fill="#caa86a" opacity=".45" />)}
+      </g>
+      {/* milk running down the side */}
+      {[[84, 0, 38], [120, 1.1, 50], [160, 2.1, 34]].map(([x, d, len]) => (
+        <g key={x} className="drip" style={{ animationDelay: `${d}s` }}>
+          <path d={`M${(x as number) - 7} 110 C ${(x as number) - 8} ${110 + (len as number) * 0.6}, ${(x as number) - 5} ${110 + (len as number)}, ${x} ${114 + (len as number)} C ${(x as number) + 5} ${110 + (len as number)}, ${(x as number) + 8} ${110 + (len as number) * 0.6}, ${(x as number) + 7} 110 Z`} fill="url(#foamG)" />
+          <ellipse cx={(x as number) - 2} cy={116 + (len as number) * 0.4} rx="1.6" ry="6" fill="#fff" opacity=".7" />
+        </g>
       ))}
       {[96, 124, 150].map((x, i) => (
-        <circle key={x} className="bubble" style={{ animationDelay: `${i * 0.8}s` }} cx={x} cy="78" r="5" fill="#fff" />
+        <circle key={x} className="bubble" style={{ animationDelay: `${i * 0.8}s` }} cx={x} cy="78" r="5" fill="#fff" opacity=".9" />
       ))}
     </g>
   );
 }
-
 function Stove() {
   return (
     <g>
@@ -122,17 +196,64 @@ export default function SunriseScene() {
           <stop offset="0" stopColor="#dca062" />
           <stop offset="1" stopColor="#a3592b" />
         </linearGradient>
-        <linearGradient id="cane" x1="0" x2="1">
-          <stop offset="0" stopColor="#4a1a5c" />
-          <stop offset=".5" stopColor="#7b3a8c" />
-          <stop offset="1" stopColor="#3b1450" />
+        {/* sugarcane: green cylinder lit from the left, yellow-green nodes, tapered leaves */}
+        <linearGradient id="caneG" x1="0" x2="1">
+          <stop offset="0" stopColor="#274d17" />
+          <stop offset=".28" stopColor="#5f8f2e" />
+          <stop offset=".42" stopColor="#8ab94c" />
+          <stop offset=".72" stopColor="#3f6d22" />
+          <stop offset="1" stopColor="#21401a" />
         </linearGradient>
-        <linearGradient id="clay" x1="0" x2="1">
-          <stop offset="0" stopColor="#a8481f" />
-          <stop offset=".45" stopColor="#d4713a" />
-          <stop offset="1" stopColor="#8c3a17" />
+        <linearGradient id="caneNode" x1="0" x2="1">
+          <stop offset="0" stopColor="#8aa33f" />
+          <stop offset=".45" stopColor="#d7de86" />
+          <stop offset="1" stopColor="#7a9535" />
         </linearGradient>
-        <clipPath id="aboveHorizon"><rect x="0" y="0" width="1440" height={HORIZON} /></clipPath>
+        <linearGradient id="leafG" x1="0" x2="1">
+          <stop offset="0" stopColor="#2c5f1c" />
+          <stop offset=".5" stopColor="#62a238" />
+          <stop offset="1" stopColor="#2f6a1f" />
+        </linearGradient>
+        <linearGradient id="cloth" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e2483a" />
+          <stop offset=".55" stopColor="#c4261b" />
+          <stop offset="1" stopColor="#8f1a12" />
+        </linearGradient>
+        {/* clay pot */}
+        <linearGradient id="clayBody" x1="0" x2="1">
+          <stop offset="0" stopColor="#7e3214" />
+          <stop offset=".3" stopColor="#d9783f" />
+          <stop offset=".46" stopColor="#e89a5c" />
+          <stop offset=".78" stopColor="#b4521f" />
+          <stop offset="1" stopColor="#6e2a10" />
+        </linearGradient>
+        <linearGradient id="clayShade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2a0e03" stopOpacity="0" />
+          <stop offset=".6" stopColor="#2a0e03" stopOpacity=".08" />
+          <stop offset="1" stopColor="#1a0802" stopOpacity=".5" />
+        </linearGradient>
+        <linearGradient id="clayRim" x1="0" x2="1">
+          <stop offset="0" stopColor="#a4481d" />
+          <stop offset=".4" stopColor="#ee9c62" />
+          <stop offset="1" stopColor="#8a3814" />
+        </linearGradient>
+        <radialGradient id="soot" cx="50%" cy="100%" r="60%">
+          <stop offset="0" stopColor="#120804" stopOpacity=".75" />
+          <stop offset="1" stopColor="#120804" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="foamG" cx="38%" cy="32%" r="75%">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset=".6" stopColor="#fbf3dd" />
+          <stop offset="1" stopColor="#e6d6ae" />
+        </radialGradient>
+        <clipPath id="potClip"><path d="M64 108 C 38 122 16 162 18 202 C 20 242 62 264 120 264 C 178 264 220 242 222 202 C 224 162 202 122 176 108 Z" /></clipPath>
+        <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" /></filter>
+        <filter id="clayGrain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 .22  0 0 0 0 .08  0 0 0 0 .02  0 0 0 .5 -.1" result="g" />
+          <feComposite in="g" in2="SourceGraphic" operator="in" result="gc" />
+          <feBlend in="SourceGraphic" in2="gc" mode="multiply" />
+        </filter>        <clipPath id="aboveHorizon"><rect x="0" y="0" width="1440" height={HORIZON} /></clipPath>
       </defs>
 
       <rect x="0" y="0" width="1440" height={HORIZON} fill="url(#skyGlow)" />

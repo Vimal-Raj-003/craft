@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pool, listCategories } from "@/lib/db";
 import ProductForm from "@/components/ProductForm";
+import { getAdmin } from "@/lib/auth";
 
 export default async function EditProduct({ params }: PageProps<"/admin/products/[id]">) {
   const id = Number((await params).id);
@@ -21,6 +22,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
       <Link href="/admin/products" className="mb-4 inline-block py-2 text-sm text-dim hover:text-ink">← All products</Link>
       <h2 className="mb-4 text-2xl font-bold">{p.name}</h2>
       <ProductForm
+        canDelete={Boolean(await getAdmin())}
         categories={categories}
         initial={{
           id: p.id, name: p.name, sku: p.sku ?? "", tagline: p.tagline, description: p.description,

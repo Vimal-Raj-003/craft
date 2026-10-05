@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { pool } from "@/lib/db";
-import { getAdmin } from "@/lib/auth";
+import { getStaff } from "@/lib/auth";
 import { fail, sameOrigin } from "@/lib/http";
 import { MAX_IMAGE_BYTES } from "@/lib/admin-products";
 
@@ -11,7 +11,7 @@ import { MAX_IMAGE_BYTES } from "@/lib/admin-products";
  */
 export async function POST(req: Request, ctx: RouteContext<"/api/admin/products/[id]/image">) {
   if (!sameOrigin(req)) return fail("Forbidden", 403);
-  if (!(await getAdmin())) return fail("Forbidden", 403);
+  if (!(await getStaff())) return fail("Forbidden", 403);
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id) || id <= 0) return fail("Not found", 404);
 

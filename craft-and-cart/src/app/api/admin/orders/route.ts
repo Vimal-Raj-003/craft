@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pool } from "@/lib/db";
-import { getAdmin } from "@/lib/auth";
+import { getStaff } from "@/lib/auth";
 import { fail, sameOrigin } from "@/lib/http";
 import { ORDER_STATUSES, setOrderStatus } from "@/lib/orders";
 
 export async function GET(req: Request) {
-  if (!(await getAdmin())) return fail("Forbidden", 403);
+  if (!(await getStaff())) return fail("Forbidden", 403);
   const q = new URL(req.url).searchParams.get("q")?.trim().slice(0, 80);
   const { rows } = await pool.query(
     `SELECT o.id,o.name,o.email,o.total_paise,o.status,o.created_at,pay.status AS payment_status,
@@ -24,7 +24,7 @@ const Patch = z.object({ id: z.string().uuid(), status: z.enum(ORDER_STATUSES) }
 
 export async function PATCH(req: Request) {
   if (!sameOrigin(req)) return fail("Forbidden", 403);
-  if (!(await getAdmin())) return fail("Forbidden", 403);
+  if (!(await getStaff())) return fail("Forbidden", 403);
   const p = Patch.safeParse(await req.json().catch(() => null));
   if (!p.success) return fail("Invalid input");
   const r = await setOrderStatus(p.data.id, p.data.status);

@@ -103,7 +103,7 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 UPDATE users SET role='SUPER_ADMIN' WHERE role='admin';
 UPDATE users SET role='CUSTOMER' WHERE role='customer';
 ALTER TABLE users ALTER COLUMN role SET DEFAULT 'CUSTOMER';
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('CUSTOMER','SUPER_ADMIN'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('CUSTOMER','ADMIN','SUPER_ADMIN'));
 
 -- Saved delivery addresses.
 CREATE TABLE IF NOT EXISTS addresses (
@@ -241,3 +241,18 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS normal_price_paise INTEGER;
 
 -- Free-shipping rule: whether each ordered unit line was free-shipping eligible when it was ordered.
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS free_shipping BOOLEAN;
+
+-- Safe payment diagnostics: one row per stage of a payment attempt (never card data, OTPs, secrets or tokens).
+CREATE TABLE IF NOT EXISTS payment_events (
+  id                  BIGSERIAL PRIMARY KEY,
+  order_id            UUID REFERENCES orders(id) ON DELETE CASCADE,
+  stage               TEXT NOT NULL,     -- order_create | checkout_open | client_failed | client_cancelled | verify | webhook | status_sync | db_update
+  ok                  BOOLEAN NOT NULL,
+  code                TEXT,              -- short safe error code
+  message             TEXT,              -- safe, truncated
+  amount_paise        INTEGER,
+  razorpay_order_id   TEXT,
+  razorpay_payment_id TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payment_events_order_idx ON payment_events(order_id, id);

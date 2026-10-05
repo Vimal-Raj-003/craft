@@ -2,20 +2,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
+const STAFF_TABS = [
   ["/admin/dashboard", "Dashboard"],
   ["/admin/orders", "Orders"],
   ["/admin/customers", "Customers"],
   ["/admin/payments", "Payments"],
   ["/admin/products", "Products"],
+] as const;
+// only the SUPER_ADMIN sees (and can open) these
+const SUPER_TABS = [
   ["/admin/offer", "First Order Offer"],
+  ["/admin/users", "Users & roles"],
+  ["/admin/diagnostics", "Razorpay check"],
 ] as const;
 
-export default function AdminNav() {
+export default function AdminNav({ superAdmin }: { superAdmin: boolean }) {
   const path = usePathname();
+  const tabs = superAdmin ? [...STAFF_TABS, ...SUPER_TABS] : STAFF_TABS;
   return (
     <nav className="flex gap-2 overflow-x-auto px-2 py-3 -mx-2 -my-3" aria-label="Admin sections">
-      {TABS.map(([href, label]) => {
+      {tabs.map(([href, label]) => {
         const on = path.startsWith(href);
         return (
           <Link key={href} href={href} aria-current={on ? "page" : undefined}

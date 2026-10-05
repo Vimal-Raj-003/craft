@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 import { AFTER_LOGIN_HOME, safeNext } from "@/lib/safe-next";
 
 export default function LoginForm({ initialMode }: { initialMode: "login" | "register" }) {
@@ -19,7 +20,7 @@ export default function LoginForm({ initialMode }: { initialMode: "login" | "reg
       if (!r.ok) { setErr(d.error ?? "Something went wrong"); setBusy(false); return; }
       // back to the page they wanted (e.g. checkout), otherwise straight to the products - never to /account
       const next = safeNext(new URLSearchParams(window.location.search).get("next"));
-      window.location.href = next ?? (d.user.role === "SUPER_ADMIN" ? "/admin/dashboard" : AFTER_LOGIN_HOME);
+      window.location.href = next ?? (d.user.role !== "CUSTOMER" ? "/admin/dashboard" : AFTER_LOGIN_HOME);
     } catch {
       setErr("Network problem. Please try again."); setBusy(false);
     }
@@ -33,7 +34,7 @@ export default function LoginForm({ initialMode }: { initialMode: "login" | "reg
         {mode === "register" && <input className="input" placeholder="Full name" autoComplete="name" required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />}
         <input className="input" type="email" placeholder="Email" autoComplete="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
         {mode === "register" && <input className="input" type="tel" placeholder="Phone number (10 digits)" autoComplete="tel" required value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />}
-        <input className="input" type="password" placeholder={mode === "register" ? "Password (min 8 characters)" : "Password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 8 : 1} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+        <PasswordInput placeholder={mode === "register" ? "Password (min 8 characters)" : "Password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 8 : 1} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
         {err && <p className="text-sm text-pink" role="alert">{err}</p>}
         <button className="btn btn-primary min-h-12 w-full" disabled={busy}>{busy ? "…" : mode === "login" ? "Sign in" : "Create account"}</button>
         {mode === "login" && (

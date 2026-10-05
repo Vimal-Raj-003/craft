@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import CartDrawer from "@/components/CartDrawer";
 import YarnThread from "@/components/YarnThread";
 import Footer from "@/components/Footer";
+import ChatWidget from "@/components/ChatWidget";
 const grotesk = Space_Grotesk({ variable: "--font-grotesk", subsets: ["latin"] });
 const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], style: ["italic", "normal"] });
 
@@ -27,7 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Navbar />
           <CartDrawer />
           <main className="px-[var(--side)]">{children}</main>
-          <div className="px-[var(--side)]"><Footer /></div>
+          <div className="px-[var(--side)] pb-16 sm:pb-0"><Footer /></div>
+          <ChatWidget />
         </Providers>
       </body>
     </html>

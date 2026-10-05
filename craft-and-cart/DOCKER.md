@@ -72,6 +72,17 @@ ADMIN_EMAIL='someone@example.com' ADMIN_PASSWORD='a-strong-password' \
   craft run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD craft-web node scripts/create-admin.cjs
 ```
 
+Roles: `CUSTOMER`, `ADMIN` (staff: dashboard, orders, customers, payments view, products) and `SUPER_ADMIN` (everything, plus product delete, the first-order offer, Users & roles, and Razorpay check). Add `-e ADMIN_ROLE=ADMIN` to create or promote a staff Admin instead. A Super Admin can also change roles on the **Users & roles** page (it blocks changing your own role or removing the last Super Admin). Customers are refused by every admin page and API on the server.
+
+### Razorpay check (find why online payment fails)
+
+```bash
+craft run --rm craft-web node scripts/razorpay-check.cjs          # key mode, auth, API reachability (no money)
+craft run --rm craft-web node scripts/razorpay-check.cjs --order  # also creates one Rs 1 test order
+```
+
+The same check runs from **Admin → Razorpay check** (Super Admin). It prints only PASS/FAIL per step and a masked key id; secrets are never shown. Each payment's stage-by-stage history is on **Admin → Payments → Details**.
+
 ## 5. Add the Nginx site (a new file; existing sites are untouched)
 
 ```bash

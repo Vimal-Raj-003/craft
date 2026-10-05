@@ -61,7 +61,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/auth/[action]">
     }
   }
 
-  // "login" is for everybody; "admin-login" (the /admin/login page) only ever accepts a Super Admin.
+  // "login" is for everybody; "admin-login" (the /admin/login page) only ever accepts staff (ADMIN or SUPER_ADMIN), never a customer.
   if (action === "login" || action === "admin-login") {
     const p = Login.safeParse(json);
     if (!p.success) return fail("Invalid input");
@@ -73,7 +73,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/auth/[action]">
     const { rows } = await pool.query("SELECT id,email,name,role,password_hash FROM users WHERE email=$1", [p.data.email]);
     const u = rows[0];
     const ok = await bcrypt.compare(p.data.password, u?.password_hash ?? DUMMY_HASH);
-    if (!u || !ok || (action === "admin-login" && u.role !== "SUPER_ADMIN")) return fail("Wrong email or password", 401);
+    if (!u || !ok || (action === "admin-login" && u.role === "CUSTOMER")) return fail("Wrong email or password", 401);
     clearRateLimit(keyEmail);
     const user = { id: u.id, email: u.email, name: u.name, role: u.role };
     await createSession(user);

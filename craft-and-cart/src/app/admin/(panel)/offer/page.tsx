@@ -3,12 +3,14 @@ import { pool } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import OfferForm from "@/components/OfferForm";
 import StatusBadge from "@/components/StatusBadge";
+import { requireSuper } from "@/lib/admin-guard";
 
 const OFFER_LABEL: Record<string, string> = { held: "Reserved", used: "Used", failed: "Used by failed payment", restored: "Restored", released: "Released" };
 
 type PromoItem = { name: string; normal: number | null; offer: number };
 
 export default async function OfferAdmin() {
+  await requireSuper();
   const [{ rows: prods }, { rows: cur }, { rows: stats }, { rows: orders }, { rows: events }] = await Promise.all([
     pool.query("SELECT id, name, price_paise FROM products WHERE active ORDER BY name"),
     pool.query(

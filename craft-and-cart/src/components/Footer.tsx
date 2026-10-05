@@ -34,6 +34,8 @@ export default function Footer() {
             <li className="font-semibold text-ink">Help</li>
             <li><Link href="/#custom" className="inline-block py-2 hover:text-ink">Custom orders</Link></li>
             <li><Link href="/account" className="inline-block py-2 hover:text-ink">My orders</Link></li>
+            <li><a href="tel:9943200746" className="inline-block py-2 hover:text-ink">Call support: 9943200746</a></li>
+            <li><Link href="/privacy-policy" className="inline-block py-2 hover:text-ink">Privacy Policy</Link></li>
           </ul>
         </div>
         <form onSubmit={subscribe}>
@@ -45,7 +47,7 @@ export default function Footer() {
           <p className="mt-2 h-5 text-sm text-mint">{msg}</p>
         </form>
       </div>
-      <p className="mt-12 text-center text-xs text-dim">© {new Date().getFullYear()} Craft & Cart · Pay online with Razorpay or Cash on Delivery</p>
+      <p className="mt-12 text-center text-xs text-dim">© {new Date().getFullYear()} Craft & Cart · Pay online with Razorpay or Cash on Delivery · <Link href="/privacy-policy" className="underline hover:text-ink">Privacy Policy</Link></p>
     </footer>
   );
 }

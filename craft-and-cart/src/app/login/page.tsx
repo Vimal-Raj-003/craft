@@ -9,7 +9,7 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
 
   // Already signed in: never show Sign Up / Sign In again; carry on shopping (or to the page they wanted).
   const user = await getSession();
-  if (user) redirect(next ?? (user.role === "SUPER_ADMIN" ? "/admin/dashboard" : AFTER_LOGIN_HOME));
+  if (user) redirect(next ?? (user.role !== "CUSTOMER" ? "/admin/dashboard" : AFTER_LOGIN_HOME));
 
   return <LoginForm initialMode={sp.mode === "register" ? "register" : "login"} />;
 }

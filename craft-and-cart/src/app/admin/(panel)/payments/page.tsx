@@ -26,7 +26,7 @@ export default async function Payments({ searchParams }: PageProps<"/admin/payme
       </div>
       <div className="glass mt-5 overflow-x-auto rounded-2xl">
         <table className="w-full min-w-[900px] text-left text-sm">
-          <thead className="text-dim"><tr><th className="p-4">Order</th><th>Customer</th><th>Amount</th><th>Status</th><th>Razorpay order ID</th><th>Razorpay payment ID</th><th className="pr-4">Date</th></tr></thead>
+          <thead className="text-dim"><tr><th className="p-4">Order</th><th>Customer</th><th>Amount</th><th>Status</th><th>Razorpay order ID</th><th>Razorpay payment ID</th><th>Date</th><th className="pr-4">Details</th></tr></thead>
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} className="border-t border-[#7a1d00]/15 align-top">
@@ -36,10 +36,11 @@ export default async function Payments({ searchParams }: PageProps<"/admin/payme
                 <td><StatusBadge value={p.status} />{p.failure_reason && p.status !== "paid" && <><br /><span className="text-xs text-dim">{p.failure_reason}</span></>}</td>
                 <td className="break-all font-mono text-xs">{p.razorpay_order_id ?? "—"}</td>
                 <td className="break-all font-mono text-xs">{p.razorpay_payment_id ?? "—"}</td>
-                <td className="whitespace-nowrap pr-4 text-dim">{new Date(p.paid_at ?? p.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td>
+                <td className="whitespace-nowrap text-dim">{new Date(p.paid_at ?? p.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td>
+                <td className="pr-4"><Link className="underline" href={`/admin/payments/${p.id}`}>View</Link></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td className="p-6 text-dim" colSpan={7}>No payments found.</td></tr>}
+            {rows.length === 0 && <tr><td className="p-6 text-dim" colSpan={8}>No payments found.</td></tr>}
           </tbody>
         </table>
       </div>

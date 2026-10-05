@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { getAdmin } from "@/lib/auth";
+import { getStaff } from "@/lib/auth";
 import { fail, sameOrigin } from "@/lib/http";
 import { ProductFields, slugify } from "@/lib/admin-products";
 
 /** Create a product (Super Admin only). Photos are uploaded afterwards on the product's edit page. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail("Forbidden", 403);
-  if (!(await getAdmin())) return fail("Forbidden", 403);
+  if (!(await getStaff())) return fail("Forbidden", 403);
   const p = ProductFields.safeParse(await req.json().catch(() => null));
   if (!p.success) return fail(p.error.issues[0]?.message ?? "Invalid input");
   const d = p.data;

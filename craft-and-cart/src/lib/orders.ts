@@ -1,6 +1,7 @@
 import { pool } from "./db";
 import { listOrderPayments, razorpayConfigured } from "./razorpay";
 import { consumeOfferOnFailure, markOfferUsed, restoreOfferForOrder } from "./offer";
+import { logPay } from "./pay-log";
 
 export const ORDER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -80,7 +81,10 @@ export async function syncRazorpayOrder(orderId: string) {
   if (!p || p.status === "paid" || !p.razorpay_order_id) return;
   try {
     const paid = (await listOrderPayments(p.razorpay_order_id)).find((x) => x.status === "captured" && x.amount === p.amount_paise);
-    if (paid) await confirmRazorpayPayment(orderId, paid.id);
+    if (paid) {
+      const first = await confirmRazorpayPayment(orderId, paid.id);
+      await logPay({ orderId, stage: "status_sync", ok: true, code: first ? "PAID" : "ALREADY_PAID", message: "Razorpay reported a captured payment", amountPaise: p.amount_paise, razorpayOrderId: p.razorpay_order_id, razorpayPaymentId: paid.id });
+    }
   } catch (e) {
     console.error("Razorpay status sync failed", e);
   }

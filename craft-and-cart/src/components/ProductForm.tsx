@@ -12,7 +12,7 @@ export type ProductFormValues = {
 };
 
 /** Create or edit a product (Super Admin). Photos can be uploaded once the product exists. */
-export default function ProductForm({ initial, categories }: { initial: ProductFormValues; categories: Category[] }) {
+export default function ProductForm({ initial, categories, canDelete = false }: { initial: ProductFormValues; categories: Category[]; canDelete?: boolean }) {
   const router = useRouter();
   const [v, setV] = useState(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -35,6 +35,16 @@ export default function ProductForm({ initial, categories }: { initial: ProductF
     if (!r || !r.ok) return setMsg({ ok: false, text: d?.error ?? "Network problem. Please try again." });
     if (isNew) { router.push(`/admin/products/${d.id}`); return; }
     setMsg({ ok: true, text: "Saved." });
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!window.confirm(`Permanently delete "${initial.name}"? Past orders keep their item names and prices, but the product disappears from the shop. This cannot be undone.`)) return;
+    setBusy(true); setMsg(null);
+    const r = await fetch(`/api/admin/products/${initial.id}`, { method: "DELETE" }).catch(() => null);
+    const d = await r?.json().catch(() => ({}));
+    if (!r || !r.ok) { setBusy(false); return setMsg({ ok: false, text: d?.error ?? "Could not delete the product." }); }
+    router.push("/admin/products");
     router.refresh();
   }
 
@@ -78,7 +88,10 @@ export default function ProductForm({ initial, categories }: { initial: ProductF
           <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5" checked={v.featured} onChange={(e) => set("featured", e.target.checked)} /> Featured on the home page</label>
         </div>
         {msg && <p className={`text-sm ${msg.ok ? "text-mint" : "text-pink"}`} role="status">{msg.text}</p>}
-        <button className="btn btn-primary min-h-12 w-full sm:w-auto" disabled={busy}>{busy ? "Saving…" : isNew ? "Create product" : "Save changes"}</button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="btn btn-primary min-h-12 w-full sm:w-auto" disabled={busy}>{busy ? "Saving…" : isNew ? "Create product" : "Save changes"}</button>
+          {canDelete && !isNew && <button type="button" onClick={remove} disabled={busy} className="btn btn-ghost min-h-12 w-full !border-pink/50 text-pink sm:w-auto">Delete product</button>}
+        </div>
       </div>
 
       <div className="glass h-fit space-y-4 rounded-3xl p-5 sm:p-7">
