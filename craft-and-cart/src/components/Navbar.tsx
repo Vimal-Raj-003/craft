@@ -76,7 +76,13 @@ export default function Navbar() {
             {links.map(([href, label]) => (
               <Link key={href} href={href} className="rounded-full px-3.5 py-2.5 transition hover:bg-white/10 hover:text-white">{label}</Link>
             ))}
-            {user && user.role !== "CUSTOMER" && <Link className="rounded-full px-3.5 py-2.5 text-[#ffd166] transition hover:bg-white/10" href="/admin/dashboard">Admin</Link>}
+            <Link
+              className="ml-1 rounded-full border border-[#ffd166]/50 px-3 py-1.5 text-xs font-semibold text-[#ffd166] transition hover:bg-[#ffd166]/15"
+              href={user && user.role !== "CUSTOMER" ? "/admin/dashboard" : "/admin/login"}
+              aria-label={user && user.role !== "CUSTOMER" ? "Admin dashboard" : "Admin sign in"}
+            >
+              Admin
+            </Link>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
@@ -142,11 +148,11 @@ export default function Navbar() {
                     {user ? `Hi, ${user.name.split(" ")[0]} · My orders` : "Sign in"}
                   </Link>
                 </li>
-                {user && user.role !== "CUSTOMER" && (
-                  <li>
-                    <Link href="/admin/dashboard" onClick={() => setMenuAt(null)} className="flex min-h-12 items-center rounded-2xl px-4 text-lg font-medium text-[#ffd166] transition active:bg-white/15">Admin dashboard</Link>
-                  </li>
-                )}
+                <li>
+                  <Link href={user && user.role !== "CUSTOMER" ? "/admin/dashboard" : "/admin/login"} onClick={() => setMenuAt(null)} className="flex min-h-12 items-center rounded-2xl px-4 text-lg font-medium text-[#ffd166] transition active:bg-white/15">
+                    {user && user.role !== "CUSTOMER" ? "Admin dashboard" : "Admin sign in"}
+                  </Link>
+                </li>
               </ul>
             </motion.div>
           )}
