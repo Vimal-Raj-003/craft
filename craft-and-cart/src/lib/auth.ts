@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { pool } from "./db";
 
@@ -44,6 +45,16 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * For pages that need a signed-in customer. A layout's redirect does NOT stop its pages from rendering (Next.js renders
+ * layouts and pages in parallel), so every such page checks the session itself instead of assuming one exists.
+ */
+export async function requireUser(next: string) {
+  const s = await getSession();
+  if (!s) redirect(`/login?next=${encodeURIComponent(next)}`);
+  return s;
 }
 
 /** The signed-in Super Admin, or null. Always checked on the server, from the database. */

@@ -1,11 +1,11 @@
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import ProfileForms from "@/components/ProfileForms";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const user = (await getSession())!;
+  const user = await requireUser("/account/profile");
   const { rows } = await pool.query("SELECT name,email,phone,created_at FROM users WHERE id=$1", [user.id]);
   const p = rows[0];
   return (

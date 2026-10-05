@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import StatusBadge from "@/components/StatusBadge";
@@ -7,7 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 export const dynamic = "force-dynamic";
 
 export default async function Account() {
-  const user = (await getSession())!; // the layout already redirected signed-out visitors
+  const user = await requireUser("/account");
   const { rows: orders } = await pool.query(
     `SELECT o.id,o.status,o.total_paise,o.created_at,pay.status AS payment_status,
             (SELECT string_agg(i.name || ' × ' || i.qty, ', ') FROM order_items i WHERE i.order_id=o.id) AS items
